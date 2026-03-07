@@ -3,16 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import useStore from '@/store/useStore';
-import { settingsAPI } from '@/lib/api';
+import { cartAPI, settingsAPI } from '@/lib/api';
 
 export default function CartPage() {
   const items = useStore((s) => s.items);
   const updateQuantity = useStore((s) => s.updateQuantity);
   const removeFromCart = useStore((s) => s.removeFromCart);
   const getTotalPrice = useStore((s) => s.getTotalPrice);
+  const isLoggedIn = useStore((s) => s.isLoggedIn());
+  const syncCartFromServer = useStore((s) => s.syncCartFromServer);
 
-  const [couponCode, setCouponCode] = useState('');
-  const [couponApplied, setCouponApplied] = useState(false);
   const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -21,11 +21,17 @@ export default function CartPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    // Sync cart from server if logged in
+    if (isLoggedIn) {
+      syncCartFromServer();
+    }
+  }, [isLoggedIn, syncCartFromServer]);
+
   const subtotal = getTotalPrice();
   const deliveryFee = subtotal > 0 ? (settings?.deliveryCharge ?? 30) : 0;
-  const discount = couponApplied ? Math.floor(subtotal * 0.1) : 0;
   const tax = Math.floor(subtotal * ((settings?.taxRate ?? 5) / 100));
-  const total = subtotal + deliveryFee + tax - discount;
+  const total = subtotal + deliveryFee + tax;
 
   const handleUpdateQty = (foodId: string, qty: number) => {
     if (qty <= 0) {
@@ -33,10 +39,6 @@ export default function CartPage() {
     } else {
       updateQuantity(foodId, qty);
     }
-  };
-
-  const applyCoupon = () => {
-    if (couponCode.trim()) setCouponApplied(true);
   };
 
   return (
@@ -74,23 +76,6 @@ export default function CartPage() {
                     </div>
                   </div>
                 ))}
-
-                {/* Coupon */}
-                <div className="card">
-                  <h3 className="font-bold mb-4">Have a Coupon?</h3>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      placeholder="Enter coupon code"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      disabled={couponApplied}
-                      className="flex-1 px-4 py-2 rounded-lg bg-dark-input border border-primary-gold/30 text-white focus:outline-none focus:border-primary-gold disabled:opacity-50"
-                    />
-                    <button onClick={applyCoupon} disabled={couponApplied} className="px-6 py-2 rounded-lg bg-primary-gold/20 text-primary-gold hover:bg-primary-gold/30 font-semibold disabled:opacity-50">Apply</button>
-                  </div>
-                  {couponApplied && <p className="text-green-400 text-sm mt-2">✓ Coupon applied successfully!</p>}
-                </div>
               </div>
 
               {/* Order Summary */}
@@ -100,7 +85,6 @@ export default function CartPage() {
                   <div className="flex justify-between"><span className="text-gray-400">Subtotal</span><span className="font-semibold">₹{subtotal}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Tax (5%)</span><span className="font-semibold">₹{tax}</span></div>
                   <div className="flex justify-between"><span className="text-gray-400">Delivery Fee</span><span className="font-semibold">₹{deliveryFee}</span></div>
-                  {discount > 0 && <div className="flex justify-between text-green-400"><span>Discount</span><span>-₹{discount}</span></div>}
                 </div>
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-xl font-bold">Total</span>

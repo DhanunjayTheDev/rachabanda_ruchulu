@@ -31,7 +31,7 @@ const createOrder = async (req, res) => {
       deliveryFee,
       total,
       deliveryType,
-      deliveryAddress: deliveryAddressId,
+      deliveryAddress: deliveryAddressId || undefined,
       paymentMethod,
       couponCode,
       status: 'pending',

@@ -14,10 +14,15 @@ interface FoodCardProps {
   rating: number;
   isVegetarian: boolean;
   categoryName: string;
+  description?: string;
 }
 
-const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName }: FoodCardProps) => {
+const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName, description }: FoodCardProps) => {
   const addToCart = useStore((s) => s.addToCart);
+  const addToWishlist = useStore((s) => s.addToWishlist);
+  const removeFromWishlist = useStore((s) => s.removeFromWishlist);
+  const isInWishlist = useStore((s) => s.isInWishlist);
+  const isInCart = useStore((s) => s.isInCart);
   const isLoggedIn = useStore((s) => s.isLoggedIn());
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const { addToast } = useToast();
@@ -36,6 +41,25 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName }
     // Add to cart
     addToCart({ foodId: id, name, price, quantity: 1, image });
     addToast(`${name} added to cart!`, 'success');
+  };
+
+  const handleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isLoggedIn) {
+      addToast('Please login to save items', 'warning');
+      setShowLoginDialog(true);
+      return;
+    }
+
+    if (isInWishlist(id)) {
+      removeFromWishlist(id);
+      addToast(`${name} removed from wishlist`, 'info');
+    } else {
+      addToWishlist({ foodId: id, name, price, image });
+      addToast(`${name} added to wishlist!`, 'success');
+    }
   };
 
   return (
@@ -72,6 +96,15 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName }
           <div className="absolute bottom-3 left-3 glass px-2 py-1 rounded-lg text-sm font-semibold text-primary-gold">
             ⭐ {rating?.toFixed?.(1) || rating}
           </div>
+
+          {/* Wishlist Button */}
+          <button
+            onClick={handleWishlist}
+            className="absolute top-3 left-3 p-2 rounded-full bg-dark-bg/80 hover:bg-dark-bg transition-colors"
+            title={isInWishlist(id) ? 'Remove from wishlist' : 'Add to wishlist'}
+          >
+            <span className="text-xl">{isInWishlist(id) ? '❤️' : '🤍'}</span>
+          </button>
         </div>
 
         {/* Content */}
@@ -80,7 +113,7 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName }
             <h3 className="text-lg font-bold text-white group-hover:text-primary-gold transition-colors">
               {name}
             </h3>
-            <p className="text-sm text-gray-400">{categoryName}</p>
+            <p className="text-sm text-gray-400">{description || categoryName}</p>
           </div>
 
           {/* Price and Buttons */}
@@ -89,9 +122,13 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName }
             <div className="flex gap-2">
               <button
                 onClick={handleAddToCart}
-                className="px-3 py-2 bg-primary-gold/20 text-primary-gold rounded-lg font-semibold hover:bg-primary-gold/30 transition-all text-sm"
+                className={`px-3 py-2 rounded-lg font-semibold transition-all text-sm ${
+                  isInCart(id)
+                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                    : "bg-primary-gold/20 text-primary-gold hover:bg-primary-gold/30"
+                }`}
               >
-                🛒 Add
+                {isInCart(id) ? "✓ In Cart" : "🛒 Add"}
               </button>
               <Link href={`/food/${id}`}>
                 <button className="px-3 py-2 bg-primary-gold text-dark-bg rounded-lg font-semibold hover:bg-accent-gold transition-all text-sm">

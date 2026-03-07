@@ -5,6 +5,9 @@ import AdminRootLayoutClient from './AdminRootLayoutClient';
 export const metadata: Metadata = {
   title: 'Admin Dashboard - Rachabanda Ruchulu',
   description: 'Admin panel for managing restaurant operations',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

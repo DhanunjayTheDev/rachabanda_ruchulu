@@ -38,7 +38,6 @@ const orderSchema = new mongoose.Schema(
       type: {
         type: String,
         enum: ['Point'],
-        default: 'Point',
       },
       coordinates: [Number],
     },
@@ -53,7 +52,7 @@ const orderSchema = new mongoose.Schema(
     total: Number,
     paymentMethod: {
       type: String,
-      enum: ['cod', 'online'],
+      enum: ['cod', 'online', 'razorpay'],
       required: true,
     },
     paymentStatus: {
@@ -92,6 +91,6 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-orderSchema.index({ deliveryLocation: '2dsphere' });
+orderSchema.index({ deliveryLocation: '2dsphere' }, { sparse: true });
 
 module.exports = mongoose.model('Order', orderSchema);

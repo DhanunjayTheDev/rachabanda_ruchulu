@@ -8,11 +8,19 @@ import useStore from '@/store/useStore';
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { getTotalItems, user, logout } = useStore();
+  const { getTotalItems, user, logout, isLoggedIn, syncCartFromServer, syncWishlistFromServer } = useStore();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Sync cart and wishlist from server when user logs in or on first load
+  useEffect(() => {
+    if (isLoggedIn()) {
+      syncCartFromServer();
+      syncWishlistFromServer();
+    }
+  }, [isLoggedIn, syncCartFromServer, syncWishlistFromServer]);
 
   return (
     <motion.header
@@ -47,6 +55,18 @@ const Header = () => {
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
+          {/* Wishlist */}
+          <Link href="/wishlist">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              className="relative glass rounded-lg px-4 py-2"
+              title="My Wishlist"
+            >
+              ❤️
+            </motion.button>
+          </Link>
+
           {/* Cart */}
           <Link href="/cart">
             <motion.button

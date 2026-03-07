@@ -2,6 +2,7 @@ const express = require('express');
 const Category = require('../models/Category');
 const { adminAuth } = require('../middleware/auth');
 const upload = require('../middleware/uploadImage');
+const { deleteImageFromCloudinary } = require('../utils/cloudinaryHelper');
 
 const router = express.Router();
 
@@ -59,8 +60,12 @@ router.put('/:id', adminAuth, upload.single('image'), async (req, res) => {
 
     const updateData = { name, description };
 
-    // Add image if uploaded
+    // If new image is uploaded, delete the old one
     if (req.file) {
+      const existingCategory = await Category.findById(req.params.id);
+      if (existingCategory && existingCategory.image) {
+        await deleteImageFromCloudinary(existingCategory.image);
+      }
       updateData.image = req.file.path;
     }
 
@@ -79,13 +84,21 @@ router.put('/:id', adminAuth, upload.single('image'), async (req, res) => {
 // Delete Category (Admin)
 router.delete('/:id', adminAuth, async (req, res) => {
   try {
-    const category = await Category.findByIdAndDelete(req.params.id);
+    const category = await Category.findById(req.params.id);
 
     if (!category) {
       return res.status(404).json({ message: 'Category not found' });
     }
 
-    res.json({ success: true, message: 'Category deleted successfully' });
+    // Delete the image from Cloudinary if it exists
+    if (category.image) {
+      await deleteImageFromCloudinary(category.image);
+    }
+
+    // Delete the category from database
+    await Category.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: 'Category and image deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

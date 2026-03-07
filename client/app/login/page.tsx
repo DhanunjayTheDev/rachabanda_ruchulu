@@ -10,6 +10,8 @@ export default function LoginPage() {
   const router = useRouter();
   const setUser = useStore((s) => s.setUser);
   const setToken = useStore((s) => s.setToken);
+  const syncCartFromServer = useStore((s) => s.syncCartFromServer);
+  const syncWishlistFromServer = useStore((s) => s.syncWishlistFromServer);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +33,11 @@ export default function LoginPage() {
         setToken(token);
       }
       if (user) setUser(user);
+      
+      // Sync cart and wishlist from server
+      await syncCartFromServer();
+      await syncWishlistFromServer();
+      
       router.push('/');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');

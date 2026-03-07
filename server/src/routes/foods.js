@@ -2,6 +2,7 @@ const express = require('express');
 const Food = require('../models/Food');
 const { adminAuth } = require('../middleware/auth');
 const upload = require('../middleware/uploadImage');
+const { deleteImageFromCloudinary } = require('../utils/cloudinaryHelper');
 
 const router = express.Router();
 
@@ -38,10 +39,11 @@ router.get('/', async (req, res) => {
     if (sort === 'rating') query = query.sort({ rating: -1 });
     if (sort === 'newest') query = query.sort({ createdAt: -1 });
 
-    const foods = await query;
+    const foods = await query.exec();
 
     res.json({ success: true, foods });
   } catch (error) {
+    console.error('Error fetching foods:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -121,7 +123,15 @@ router.put('/:id', adminAuth, upload.single('image'), async (req, res) => {
     if (isVegetarian !== undefined) updateData.isVegetarian = isVegetarian === 'true';
     if (isFeatured !== undefined) updateData.isFeatured = isFeatured === 'true';
     if (ingredients) updateData.ingredients = ingredients.split(',').map((ing) => ing.trim());
-    if (req.file) updateData.image = req.file.path;
+
+    // If new image is uploaded, delete the old one
+    if (req.file) {
+      const existingFood = await Food.findById(req.params.id);
+      if (existingFood && existingFood.image) {
+        await deleteImageFromCloudinary(existingFood.image);
+      }
+      updateData.image = req.file.path;
+    }
 
     const food = await Food.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
 
@@ -138,13 +148,21 @@ router.put('/:id', adminAuth, upload.single('image'), async (req, res) => {
 // Delete Food (Admin)
 router.delete('/:id', adminAuth, async (req, res) => {
   try {
-    const food = await Food.findByIdAndDelete(req.params.id);
+    const food = await Food.findById(req.params.id);
 
     if (!food) {
       return res.status(404).json({ message: 'Food not found' });
     }
 
-    res.json({ success: true, message: 'Food deleted successfully' });
+    // Delete the image from Cloudinary if it exists
+    if (food.image) {
+      await deleteImageFromCloudinary(food.image);
+    }
+
+    // Delete the food from database
+    await Food.findByIdAndDelete(req.params.id);
+
+    res.json({ success: true, message: 'Food and image deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -11,6 +11,17 @@ const getCart = async (req, res) => {
       await cart.save();
     }
 
+    // Filter out deleted items (where food is null)
+    const validItems = cart.items.filter((item) => item.food !== null);
+    const hasDeletedItems = validItems.length !== cart.items.length;
+
+    if (hasDeletedItems) {
+      // Remove deleted items from database
+      cart.items = validItems;
+      cart.subtotal = cart.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+      await cart.save();
+    }
+
     res.json({ success: true, cart });
   } catch (error) {
     res.status(500).json({ message: error.message });

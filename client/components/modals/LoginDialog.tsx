@@ -23,6 +23,8 @@ export default function LoginDialog({ open, onClose, onLoginSuccess }: LoginDial
   });
   const setUser = useStore((s) => s.setUser);
   const setToken = useStore((s) => s.setToken);
+  const syncWishlistFromServer = useStore((s) => s.syncWishlistFromServer);
+  const syncCartFromServer = useStore((s) => s.syncCartFromServer);
   const { addToast } = useToast();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +53,10 @@ export default function LoginDialog({ open, onClose, onLoginSuccess }: LoginDial
           phone: userData.phone,
         });
       }
+
+      // Sync wishlist and cart from server
+      await syncWishlistFromServer();
+      await syncCartFromServer();
 
       addToast('Login successful!', 'success');
       setFormData({ email: '', password: '', name: '', phone: '' });
@@ -93,6 +99,10 @@ export default function LoginDialog({ open, onClose, onLoginSuccess }: LoginDial
           phone: userData.phone,
         });
       }
+
+      // Sync wishlist and cart from server
+      await syncWishlistFromServer();
+      await syncCartFromServer();
 
       addToast('Account created successfully!', 'success');
       setFormData({ email: '', password: '', name: '', phone: '' });

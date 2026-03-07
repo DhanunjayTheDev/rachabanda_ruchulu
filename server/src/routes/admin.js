@@ -3,10 +3,13 @@ const bcrypt = require('bcryptjs');
 const { generateToken } = require('../config/jwt');
 const { adminAuth } = require('../middleware/auth');
 const upload = require('../middleware/uploadImage');
+const { deleteImageFromCloudinary } = require('../utils/cloudinaryHelper');
 const Admin = require('../models/Admin');
 const Order = require('../models/Order');
 const Food = require('../models/Food');
 const Category = require('../models/Category');
+const Cart = require('../models/Cart');
+const Wishlist = require('../models/Wishlist');
 const { getSettings, updateSettings } = require('../controllers/settingsController');
 const {
   getAllQRCodes,
@@ -68,6 +71,17 @@ router.get('/orders', adminAuth, async (req, res) => {
     const orders = await Order.find().populate('user').populate('items.food').sort({ createdAt: -1 });
 
     res.json({ success: true, orders });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all foods for admin (with category populated)
+router.get('/foods', adminAuth, async (req, res) => {
+  try {
+    const foods = await Food.find().populate('category').sort({ createdAt: -1 });
+
+    res.json({ success: true, foods });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -164,9 +178,43 @@ router.put('/foods/:id', adminAuth, upload.single('image'), async (req, res) => 
 
 router.delete('/foods/:id', adminAuth, async (req, res) => {
   try {
-    await Food.findByIdAndDelete(req.params.id);
+    const foodId = req.params.id;
 
-    res.json({ success: true, message: 'Food deleted' });
+    // Get the food to retrieve image URL before deleting
+    const food = await Food.findById(foodId);
+
+    if (!food) {
+      return res.status(404).json({ message: 'Food not found' });
+    }
+
+    // Delete the image from Cloudinary if it exists
+    if (food.image) {
+      await deleteImageFromCloudinary(food.image);
+    }
+
+    // Delete the food from database
+    await Food.findByIdAndDelete(foodId);
+
+    // Remove from all wishlists
+    await Wishlist.updateMany(
+      { 'items.food': foodId },
+      { $pull: { items: { food: foodId } } }
+    );
+
+    // Remove from all carts
+    await Cart.updateMany(
+      { 'items.food': foodId },
+      { $pull: { items: { food: foodId } } }
+    );
+
+    // Recalculate subtotals for affected carts
+    const affectedCarts = await Cart.find({ 'items.0': { $exists: true } });
+    for (let cart of affectedCarts) {
+      cart.subtotal = cart.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+      await cart.save();
+    }
+
+    res.json({ success: true, message: 'Food and image deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

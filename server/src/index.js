@@ -30,6 +30,7 @@ const startServer = async () => {
   app.use('/api/foods', require('./routes/foods'));
   app.use('/api/categories', require('./routes/categories'));
   app.use('/api/cart', require('./routes/cart'));
+  app.use('/api/wishlist', require('./routes/wishlist'));
   app.use('/api/orders', require('./routes/orders'));
   app.use('/api/payments', require('./routes/payments'));
   app.use('/api/contact', require('./routes/contact'));

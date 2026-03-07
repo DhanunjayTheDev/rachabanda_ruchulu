@@ -42,6 +42,13 @@ export const cartAPI = {
   clear: () => apiClient.delete('/cart/clear'),
 };
 
+export const wishlistAPI = {
+  add: (data: any) => apiClient.post('/wishlist/add', data),
+  get: () => apiClient.get('/wishlist'),
+  remove: (data: any) => apiClient.delete('/wishlist/remove', { data }),
+  clear: () => apiClient.delete('/wishlist/clear'),
+};
+
 export const orderAPI = {
   create: (data: any) => apiClient.post('/orders', data),
   getAll: () => apiClient.get('/orders'),
@@ -72,6 +79,7 @@ export const announcementAPI = {
 
 export const couponAPI = {
   getAll: () => apiClient.get('/coupons'),
+  verify: (data: { code: string; orderValue: number }) => apiClient.post('/coupons/verify', data),
 };
 
 export const settingsAPI = {

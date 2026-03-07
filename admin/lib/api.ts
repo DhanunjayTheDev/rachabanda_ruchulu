@@ -45,7 +45,7 @@ export const dashboardAPI = {
 
 // Foods
 export const foodsAPI = {
-  getAll: (params?: Record<string, string>) => api.get('/foods', { params }),
+  getAll: (params?: Record<string, string>) => api.get('/admin/foods', { params }),
   getById: (id: string) => api.get(`/foods/${id}`),
   create: (data: FormData) => api.post('/foods', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   update: (id: string, data: FormData) => api.put(`/foods/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),

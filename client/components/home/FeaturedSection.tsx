@@ -58,6 +58,7 @@ const FeaturedSection = () => {
                 rating={food.rating || 4.5}
                 isVegetarian={food.isVegetarian || false}
                 categoryName={typeof food.category === 'object' ? food.category?.name : food.category || ''}
+                description={food.description}
               />
             ))}
           </div>
