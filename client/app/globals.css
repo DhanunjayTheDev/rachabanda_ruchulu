@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: linear-gradient(135deg, #0F0B08 0%, #1A1410 50%, #2B1D15 100%);
+  color: #E7E7E9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(212, 175, 55, 0.05) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 80%, rgba(212, 175, 55, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glass Morphism */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Typography */
+h1 {
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+p {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E7C873;
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    to right,
+    #0F0B08 0%,
+    #1A1410 50%,
+    #0F0B08 100%
+  );
+  background-size: 1000px 100%;
+}
+
+/* Buttons */
+.btn {
+  @apply px-6 py-3 rounded-lg font-semibold transition-all duration-300 ease-out hover:scale-105 active:scale-95;
+}
+
+.btn-primary {
+  @apply bg-primary-gold text-secondary-dark-brown hover:bg-primary-accent-gold shadow-lg hover:shadow-glow-lg;
+}
+
+.btn-secondary {
+  @apply bg-secondary-dark-brown text-primary-gold border border-primary-gold hover:bg-primary-gold hover:text-secondary-dark-brown;
+}
+
+.btn-outline {
+  @apply border border-primary-gold text-primary-gold hover:bg-primary-gold hover:text-secondary-dark-brown;
+}
+
+/* Cards */
+.card {
+  @apply glass rounded-2xl p-6 transition-all duration-300 hover:shadow-glow;
+}
+
+.card-dark {
+  @apply glass-dark rounded-2xl p-6 transition-all duration-300 hover:shadow-glow;
+}
+
+/* Input */
+input,
+textarea,
+select {
+  @apply bg-dark-input border border-primary-gold/30 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:outline-none focus:border-primary-gold focus:ring-1 focus:ring-primary-gold/50 transition-all;
+}
+
+/* Loading State */
+.loader {
+  border: 3px solid rgba(212, 175, 55, 0.3);
+  border-top: 3px solid #D4AF37;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: rachabanda_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - rachabanda_network
+
+  server:
+    build: ./server
+    container_name: rachabanda_server
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://admin:password@mongodb:27017/rachabanda?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+    depends_on:
+      - mongodb
+    networks:
+      - rachabanda_network
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    container_name: rachabanda_client
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://server:5000/api
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      NEXT_PUBLIC_RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+    depends_on:
+      - server
+    networks:
+      - rachabanda_network
+
+  admin:
+    build: ./admin
+    container_name: rachabanda_admin
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://server:5000/api
+    depends_on:
+      - server
+    networks:
+      - rachabanda_network
+
+volumes:
+  mongodb_data:
+
+networks:
+  rachabanda_network:
+    driver: bridge

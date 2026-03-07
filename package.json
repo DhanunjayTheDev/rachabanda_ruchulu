@@ -1,0 +1,28 @@
+{
+  "name": "rachabanda-ruchulu",
+  "version": "1.0.0",
+  "description": "Premium food ordering platform for Rachabanda Ruchulu restaurant",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run dev --workspace=client & npm run dev --workspace=admin & npm run dev --workspace=server",
+    "build": "npm run build --workspace=client && npm run build --workspace=admin && npm run build --workspace=server",
+    "start": "npm start --workspace=server",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up",
+    "docker:down": "docker-compose down"
+  },
+  "workspaces": [
+    "client",
+    "admin",
+    "server"
+  ],
+  "keywords": [
+    "food-ordering",
+    "restaurant",
+    "next.js",
+    "express",
+    "mongodb"
+  ],
+  "author": "Rachabanda Ruchulu",
+  "license": "MIT"
+}

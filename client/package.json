@@ -1,0 +1,37 @@
+{
+  "name": "rachabanda-client",
+  "version": "1.0.0",
+  "description": "Premium food ordering frontend",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.2.0",
+    "tailwindcss": "^3.3.0",
+    "framer-motion": "^10.16.4",
+    "zustand": "^4.4.1",
+    "axios": "^1.5.0",
+    "react-query": "^3.39.3",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dropdown-menu": "^2.0.5",
+    "lucide-react": "^0.263.0",
+    "razorpay": "^2.9.1",
+    "next-auth": "^4.23.2",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/node": "^20.5.0",
+    "autoprefixer": "^10.4.15",
+    "postcss": "^8.4.29",
+    "@tailwindcss/typography": "^0.5.10",
+    "eslint": "^8.48.0",
+    "eslint-config-next": "^14.0.0"
+  }
+}
