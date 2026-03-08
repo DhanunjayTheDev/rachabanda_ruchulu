@@ -1,4 +1,3 @@
-const { v4: uuidv4 } = require('uuid');
 
 const generateOrderId = () => {
   return `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
