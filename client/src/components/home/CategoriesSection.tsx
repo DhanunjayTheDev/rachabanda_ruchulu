@@ -46,20 +46,20 @@ const CategoriesSection = () => {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="flex overflow-x-auto md:grid md:grid-cols-5 gap-4 md:gap-8 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="animate-pulse bg-dark-card rounded-2xl h-32"></div>
+              <div key={i} className="animate-pulse bg-dark-card rounded-2xl w-32 md:w-auto h-32 shrink-0"></div>
             ))}
           </div>
         ) : categories.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+          <div className="flex overflow-x-auto md:grid md:grid-cols-5 gap-4 md:gap-8 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {categories.map((cat: any) => {
               const name = cat.name || '';
               const hasImage = cat.image && typeof cat.image === 'string' && cat.image.startsWith('http');
               const emoji = !hasImage ? (cat.emoji || defaultEmojis[name.toLowerCase()] || '🍽️') : null;
-              
+
               return (
-                <a key={cat._id || cat.id} href={`/menu?category=${name.toLowerCase()}`} className="group flex flex-col items-center">
+                <a key={cat._id || cat.id} href={`/menu?category=${name.toLowerCase()}`} className="group flex flex-col items-center shrink-0 w-32 md:w-auto">
                   <div className="w-32 h-32 rounded-full overflow-hidden mb-4 relative group-hover:shadow-glow-lg transition-all duration-300 group-hover:scale-110">
                     {hasImage ? (
                       <>

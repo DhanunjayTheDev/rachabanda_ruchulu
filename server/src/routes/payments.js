@@ -87,14 +87,37 @@ router.post('/verify', auth, async (req, res) => {
 
     await order.save();
 
-    // Broadcast the order update to notify the user
-    broadcastOrdersUpdate('updated', order);
+    // Broadcast as 'created' for the admin since it's now a valid active order
+    broadcastOrdersUpdate('created', order);
 
     res.json({
       success: true,
       message: 'Payment verified',
       order,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/cancel', auth, async (req, res) => {
+  try {
+    const { orderId, paymentId } = req.body;
+
+    if (orderId) {
+      await Order.findByIdAndUpdate(orderId, {
+        status: 'cancelled',
+        paymentStatus: 'failed',
+      });
+    }
+
+    if (paymentId) {
+      await Payment.findByIdAndUpdate(paymentId, {
+        status: 'failed',
+      });
+    }
+
+    res.json({ success: true, message: 'Payment cancelled and order marked as failed' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

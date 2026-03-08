@@ -11,6 +11,8 @@ interface CartItem {
   image: string;
   selectedSize?: string;
   selectedAddOns?: string[];
+  selectedSizeName?: string;
+  selectedAddOnNames?: string[];
   specialInstructions?: string;
 }
 
@@ -58,13 +60,42 @@ interface CartStore {
   syncCartToServer: () => Promise<void>;
 }
 
+// Read persisted state synchronously at module load time
+// This ensures the first render already has the correct auth state
+function getPersistedState() {
+  try {
+    const stored = localStorage.getItem('rachabanda-store');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const state = parsed?.state;
+      if (state) {
+        // Also keep the standalone token key in sync
+        if (state.token) {
+          localStorage.setItem('token', state.token);
+        }
+        return {
+          user: state.user || null,
+          token: state.token || null,
+          items: state.items || [],
+          wishlistItems: state.wishlistItems || [],
+        };
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { user: null, token: null, items: [], wishlistItems: [] };
+}
+
+const persistedState = getPersistedState();
+
 const useStore = create<CartStore>()(
   persist(
     (set, get) => ({
-      items: [],
-      wishlistItems: [],
-      user: null,
-      token: null,
+      items: persistedState.items,
+      wishlistItems: persistedState.wishlistItems,
+      user: persistedState.user,
+      token: persistedState.token,
       isLoadingCart: false,
       isLoadingWishlist: false,
 
@@ -113,8 +144,8 @@ const useStore = create<CartStore>()(
               set((state) => ({
                 items: state.items.map((i) =>
                   i.foodId === item.foodId &&
-                  (i.selectedSize || '') === (item.selectedSize || '') &&
-                  normalizeAddOns(i.selectedAddOns) === normalizeAddOns(item.selectedAddOns)
+                    (i.selectedSize || '') === (item.selectedSize || '') &&
+                    normalizeAddOns(i.selectedAddOns) === normalizeAddOns(item.selectedAddOns)
                     ? { ...i, _id: serverItem._id }
                     : i
                 ),
@@ -130,7 +161,7 @@ const useStore = create<CartStore>()(
         const itemToRemove = get().items.find((i) => i._id === itemId || i.foodId === itemId);
         if (!itemToRemove) return;
         const serverItemId = itemToRemove._id;
-        
+
         if (serverItemId) {
           try {
             await cartAPI.remove(serverItemId);
@@ -169,7 +200,7 @@ const useStore = create<CartStore>()(
             item.foodId === foodId ? { ...item, ...updates } : item
           ),
         }));
-        
+
         // Find the item and sync with server
         const state = get();
         const item = state.items.find((i) => i.foodId === foodId);
@@ -192,7 +223,7 @@ const useStore = create<CartStore>()(
       },
 
       getTotalItems: () => {
-        return get().items.reduce((total, item) => total + item.quantity, 0);
+        return get().items.length;
       },
 
       getWishlistCount: () => {
@@ -253,19 +284,39 @@ const useStore = create<CartStore>()(
         try {
           set({ isLoadingCart: true });
           const res = await cartAPI.get();
-          
+
           if (res.data?.success && res.data?.cart?.items) {
             const validItems = res.data.cart.items.filter((item: any) => item.food && item.food._id);
-            const cartItems = validItems.map((item: any) => ({
-              _id: item._id,
-              foodId: item.food._id,
-              name: item.food.name,
-              price: item.price,
-              quantity: item.quantity,
-              image: item.food.image || '',
-              selectedSize: item.selectedSize,
-              selectedAddOns: item.selectedAddOns,
-            }));
+            const cartItems = validItems.map((item: any) => {
+              // Resolve size name from food's sizes array
+              let selectedSizeName = item.selectedSizeName;
+              if (!selectedSizeName && item.selectedSize && item.food?.sizes) {
+                const sizeObj = item.food.sizes.find((s: any) => s._id === item.selectedSize || s.name === item.selectedSize);
+                selectedSizeName = sizeObj?.name || item.selectedSize;
+              }
+
+              // Resolve addon names from food's addOns array
+              let selectedAddOnNames = item.selectedAddOnNames;
+              if (!selectedAddOnNames && item.selectedAddOns?.length && item.food?.addOns) {
+                selectedAddOnNames = item.selectedAddOns.map((addonId: string) => {
+                  const addonObj = item.food.addOns.find((a: any) => a._id === addonId || a.name === addonId);
+                  return addonObj?.name || addonId;
+                });
+              }
+
+              return {
+                _id: item._id,
+                foodId: item.food._id,
+                name: item.food.name,
+                price: item.price,
+                quantity: item.quantity,
+                image: item.food.image || '',
+                selectedSize: item.selectedSize,
+                selectedAddOns: item.selectedAddOns,
+                selectedSizeName,
+                selectedAddOnNames,
+              };
+            });
             set({ items: cartItems });
           }
         } catch (error) {
@@ -279,7 +330,7 @@ const useStore = create<CartStore>()(
         try {
           set({ isLoadingWishlist: true });
           const res = await wishlistAPI.get();
-          
+
           if (res.data?.success && res.data?.wishlist?.items) {
             const validItems = res.data.wishlist.items.filter((item: any) => item.food && item.food._id);
             const wishlistItems = validItems.map((item: any) => ({
@@ -326,6 +377,7 @@ const useStore = create<CartStore>()(
         items: state.items,
         wishlistItems: state.wishlistItems,
       }),
+
     }
   )
 );

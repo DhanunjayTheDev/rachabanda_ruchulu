@@ -10,7 +10,21 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  // Fallback: read token from zustand persist store if standalone key is missing
+  if (!token && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('rachabanda-store');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        token = parsed?.state?.token || null;
+        // Re-sync the standalone key
+        if (token) localStorage.setItem('token', token);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -58,6 +72,7 @@ export const orderAPI = {
 export const paymentAPI = {
   createOrder: (data: any) => apiClient.post('/payments/create-order', data),
   verify: (data: any) => apiClient.post('/payments/verify', data),
+  cancel: (data: any) => apiClient.post('/payments/cancel', data),
 };
 
 export const userAPI = {

@@ -94,6 +94,7 @@ export default function FoodDetailsPage() {
       return;
     }
 
+    const selectedAddOnNames = addOns.filter((a) => selectedAddOns.includes(a._id)).map((a) => a.name);
     addToCart({
       foodId: food._id,
       name: food.name,
@@ -102,6 +103,8 @@ export default function FoodDetailsPage() {
       image: food.image,
       selectedSize: selectedSize || undefined,
       selectedAddOns: selectedAddOns.length ? selectedAddOns : undefined,
+      selectedSizeName: selectedSizeData?.name || undefined,
+      selectedAddOnNames: selectedAddOnNames.length ? selectedAddOnNames : undefined,
     });
     addToast(`${food.name} added to cart!`, 'success');
     setAdded(true);
@@ -128,174 +131,176 @@ export default function FoodDetailsPage() {
 
   return (
     <main className="min-h-screen pt-28 pb-20 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-6 text-gray-400 text-sm">
-            <Link to="/" className="text-primary-gold hover:underline">Home</Link>
-            {' / '}
-            <Link to="/menu" className="text-primary-gold hover:underline">Menu</Link>
-            {' / '}<span>{food.name}</span>
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-6 text-gray-400 text-sm">
+          <Link to="/" className="text-primary-gold hover:underline">Home</Link>
+          {' / '}
+          <Link to="/menu" className="text-primary-gold hover:underline">Menu</Link>
+          {' / '}<span>{food.name}</span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Image */}
+          <div className="card flex items-center justify-center overflow-hidden">
+            {food.image && food.image.startsWith('http') ? (
+              <img src={food.image} alt={food.name} className="w-full h-96 object-cover rounded-xl" loading="lazy" />
+            ) : (
+              <div className="text-9xl">{food.image || '🍽️'}</div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Image */}
-            <div className="card flex items-center justify-center overflow-hidden">
-              {food.image && food.image.startsWith('http') ? (
-                <img src={food.image} alt={food.name} className="w-full h-96 object-cover rounded-xl" loading="lazy" />
-              ) : (
-                <div className="text-9xl">{food.image || '🍽️'}</div>
-              )}
+          {/* Details */}
+          <div>
+            <div className="mb-6">
+              <h1 className="text-4xl font-bold mb-2">{food.name}</h1>
+              <div className="flex items-center gap-4 mb-4">
+                <span className="text-primary-gold">⭐ {food.rating?.toFixed(1) || 'N/A'}</span>
+                {food.reviewCount > 0 && <span className="text-gray-400">({food.reviewCount} reviews)</span>}
+                {(() => {
+                  const typeInfo = getFoodTypeDisplay();
+                  return (
+                    <span className={`${typeInfo.color} px-2 py-0.5 rounded text-xs font-semibold`}>
+                      {typeInfo.emoji} {typeInfo.label}
+                    </span>
+                  );
+                })()}
+              </div>
+              <p className="text-gray-400">{food.description}</p>
             </div>
 
-            {/* Details */}
-            <div>
+            {/* Size Selection */}
+            {sizes.length > 0 && (
               <div className="mb-6">
-                <h1 className="text-4xl font-bold mb-2">{food.name}</h1>
-                <div className="flex items-center gap-4 mb-4">
-                  <span className="text-primary-gold">⭐ {food.rating?.toFixed(1) || 'N/A'}</span>
-                  {food.reviewCount > 0 && <span className="text-gray-400">({food.reviewCount} reviews)</span>}
-                  {(() => {
-                    const typeInfo = getFoodTypeDisplay();
-                    return (
-                      <span className={`${typeInfo.color} px-2 py-0.5 rounded text-xs font-semibold`}>
-                        {typeInfo.emoji} {typeInfo.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-                <p className="text-gray-400">{food.description}</p>
-              </div>
-
-              {/* Size Selection */}
-              {sizes.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold mb-3">Select Size</h3>
-                  <div className="grid grid-cols-3 gap-3">
-                    {sizes.map((size) => (
-                      <button
-                        key={size._id}
-                        onClick={() => setSelectedSize(size._id)}
-                        className={`p-3 rounded-lg border transition-all ${
-                          selectedSize === size._id
-                            ? 'border-primary-gold bg-primary-gold/10'
-                            : 'border-gray-600 hover:border-primary-gold'
+                <h3 className="font-bold mb-3">Select Size</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {sizes.map((size) => (
+                    <button
+                      key={size._id}
+                      onClick={() => setSelectedSize(size._id)}
+                      className={`p-3 rounded-lg border transition-all ${selectedSize === size._id
+                        ? 'border-primary-gold bg-primary-gold/10'
+                        : 'border-gray-600 hover:border-primary-gold'
                         }`}
-                      >
-                        <div className="font-semibold">{size.name}</div>
-                        <div className="text-sm text-gray-400">₹{size.price}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Add-ons */}
-              {addOns.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold mb-3">Add-ons</h3>
-                  <div className="space-y-2">
-                    {addOns.map((addon) => (
-                      <label
-                        key={addon._id}
-                        className="flex items-center gap-3 p-3 border border-gray-600 rounded-lg hover:border-primary-gold cursor-pointer transition-all"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedAddOns.includes(addon._id)}
-                          onChange={() => toggleAddOn(addon._id)}
-                          className="w-4 h-4 accent-primary-gold"
-                        />
-                        <span className="flex-1">{addon.name}</span>
-                        <span className="text-primary-gold font-bold">+₹{addon.price}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quantity */}
-              <div className="card mb-6">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Quantity</span>
-                  <div className="flex items-center gap-4">
-                    <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">−</button>
-                    <span className="text-xl font-bold w-8 text-center">{quantity}</span>
-                    <button onClick={() => setQuantity(quantity + 1)} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">+</button>
-                  </div>
+                    >
+                      <div className="font-semibold">{size.name}</div>
+                      <div className="text-sm text-gray-400">₹{size.price}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
+            )}
 
-              {/* Price */}
-              <div className="mb-6 card">
-                <div className="flex justify-between items-center">
-                  <span className="text-xl font-bold">Total</span>
-                  <span className="text-2xl font-bold text-primary-gold">₹{(basePrice + addOnsTotal) * quantity}</span>
+            {/* Add-ons */}
+            {addOns.length > 0 && (
+              <div className="mb-6">
+                <h3 className="font-bold mb-3">Add-ons</h3>
+                <div className="space-y-2">
+                  {addOns.map((addon) => (
+                    <label
+                      key={addon._id}
+                      className="flex items-center gap-3 p-3 border border-gray-600 rounded-lg hover:border-primary-gold cursor-pointer transition-all"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAddOns.includes(addon._id)}
+                        onChange={() => toggleAddOn(addon._id)}
+                        className="w-4 h-4 accent-primary-gold"
+                      />
+                      <span className="flex-1">{addon.name}</span>
+                      <span className="text-primary-gold font-bold">+₹{addon.price}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
+            )}
 
-              <button onClick={handleAddToCart} className={`w-full btn mb-4 ${added ? 'bg-green-500 text-white' : 'btn-primary'}`}>
-                {added ? '✓ Added to Cart!' : '🛒 Add to Cart'}
-              </button>
-
-              <Link to="/menu">
-                <button className="w-full btn btn-outline">Continue Shopping</button>
-              </Link>
+            {/* Quantity */}
+            <div className="card mb-6">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Quantity</span>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">−</button>
+                  <span className="text-xl font-bold w-8 text-center">{quantity}</span>
+                  <button onClick={() => setQuantity(quantity + 1)} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">+</button>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Ingredients & Reviews */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-20">
-            {food.ingredients?.length > 0 && (
-              <div className="card">
-                <h3 className="text-2xl font-bold mb-6">Ingredients</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {food.ingredients.map((ingredient) => (
-                    <div key={ingredient} className="flex items-center gap-3 p-3 rounded-lg bg-primary-gold/10 border border-primary-gold/20">
-                      <span className="text-primary-gold">✓</span>
-                      <span>{ingredient}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* Price */}
+            <div className="mb-6 card">
+              <div className="flex justify-between items-center">
+                <span className="text-xl font-bold">Total</span>
+                <span className="text-2xl font-bold text-primary-gold">₹{(basePrice + addOnsTotal) * quantity}</span>
               </div>
-            )}
+            </div>
 
-            {reviews.length > 0 && (
-              <div className="card">
-                <h3 className="text-2xl font-bold mb-6">Customer Reviews</h3>
-                <div className="space-y-4">
-                  {reviews.map((review) => (
-                    <div key={review._id} className="pb-4 border-b border-gray-600">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="font-semibold">{review.user?.name || 'Customer'}</span>
-                        <span className="text-primary-gold">{'⭐'.repeat(review.rating)}</span>
-                      </div>
-                      <p className="text-gray-400 text-sm">{review.comment}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button onClick={handleAddToCart} className={`w-full btn mb-4 ${added ? 'bg-green-500 text-white' : 'btn-primary'}`}>
+              {added ? '✓ Added to Cart!' : '🛒 Add to Cart'}
+            </button>
+
+            <Link to="/menu">
+              <button className="w-full btn btn-outline">Continue Shopping</button>
+            </Link>
           </div>
         </div>
 
-        {/* Login Dialog */}
-        <LoginDialog
-          open={showLoginDialog}
-          onClose={() => setShowLoginDialog(false)}
-          onLoginSuccess={() => {
-            addToCart({
-              foodId: food._id,
-              name: food.name,
-              price: basePrice + addOnsTotal,
-              quantity,
-              image: food.image,
-              selectedSize: selectedSize || undefined,
-              selectedAddOns: selectedAddOns.length ? selectedAddOns : undefined,
-            });
-            addToast(`${food.name} added to cart!`, 'success');
-            setAdded(true);
-            setTimeout(() => setAdded(false), 2000);
-          }}
-        />
-      </main>
+        {/* Ingredients & Reviews */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-20">
+          {food.ingredients?.length > 0 && (
+            <div className="card">
+              <h3 className="text-2xl font-bold mb-6">Ingredients</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {food.ingredients.map((ingredient) => (
+                  <div key={ingredient} className="flex items-center gap-3 p-3 rounded-lg bg-primary-gold/10 border border-primary-gold/20">
+                    <span className="text-primary-gold">✓</span>
+                    <span>{ingredient}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {reviews.length > 0 && (
+            <div className="card">
+              <h3 className="text-2xl font-bold mb-6">Customer Reviews</h3>
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div key={review._id} className="pb-4 border-b border-gray-600">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-semibold">{review.user?.name || 'Customer'}</span>
+                      <span className="text-primary-gold">{'⭐'.repeat(review.rating)}</span>
+                    </div>
+                    <p className="text-gray-400 text-sm">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Login Dialog */}
+      <LoginDialog
+        open={showLoginDialog}
+        onClose={() => setShowLoginDialog(false)}
+        onLoginSuccess={() => {
+          const selectedAddOnNames = addOns.filter((a) => selectedAddOns.includes(a._id)).map((a) => a.name);
+          addToCart({
+            foodId: food._id,
+            name: food.name,
+            price: basePrice + addOnsTotal,
+            quantity,
+            image: food.image,
+            selectedSize: selectedSize || undefined,
+            selectedAddOns: selectedAddOns.length ? selectedAddOns : undefined,
+            selectedSizeName: selectedSizeData?.name || undefined,
+            selectedAddOnNames: selectedAddOnNames.length ? selectedAddOnNames : undefined,
+          });
+          addToast(`${food.name} added to cart!`, 'success');
+          setAdded(true);
+          setTimeout(() => setAdded(false), 2000);
+        }}
+      />
+    </main>
   );
 }

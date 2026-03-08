@@ -39,27 +39,27 @@ const HeroSection = () => {
             Experience the authentic taste of traditional Hyderabadi cuisine crafted with premium ingredients and served with excellence.
           </motion.p>
 
-          <motion.div variants={itemVariants} className="flex gap-6 justify-center pt-8">
+          <motion.div variants={itemVariants} className="flex gap-4 md:gap-6 justify-center pt-8">
             <Link to="/menu"><button className="btn btn-primary">Order Now</button></Link>
             <Link to="/menu"><button className="btn btn-outline">View Menu</button></Link>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="grid grid-cols-3 gap-6 pt-16">
+          <motion.div variants={itemVariants} className="grid grid-cols-3 gap-2 sm:gap-6 pt-12 md:pt-16">
             {[
               { label: '1000+', desc: 'Happy Customers' },
               { label: '30 min', desc: 'Fast Delivery' },
               { label: '⭐ 4.8', desc: 'Rating' },
             ].map((stat, i) => (
-              <div key={i} className="glass rounded-xl p-4">
-                <p className="text-2xl font-bold text-primary-gold">{stat.label}</p>
-                <p className="text-sm text-gray-400">{stat.desc}</p>
+              <div key={i} className="glass rounded-xl p-2 sm:p-4 text-center">
+                <p className="text-xl sm:text-2xl font-bold text-primary-gold leading-none pb-1">{stat.label}</p>
+                <p className="text-xs sm:text-sm text-gray-400 leading-tight">{stat.desc}</p>
               </div>
             ))}
           </motion.div>
         </motion.div>
       </div>
 
-      <motion.div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20" animate={{ y: [0, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
+      <motion.div className="hidden md:block absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20" animate={{ y: [0, 10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
         <div className="w-6 h-10 border-2 border-primary-gold rounded-full flex items-start justify-center p-2">
           <motion.div className="w-1 h-2 bg-primary-gold rounded-full" animate={{ y: [0, 12, 0] }} transition={{ duration: 2, repeat: Infinity }} />
         </div>

@@ -51,7 +51,7 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
-    settingsAPI.get().then((res) => setSettings(res.data?.settings)).catch(() => {});
+    settingsAPI.get().then((res) => setSettings(res.data?.settings)).catch(() => { });
   }, []);
 
   useRealtimeSettings((updatedSettings) => {
@@ -161,18 +161,23 @@ export default function CheckoutPage() {
         ? `${selectedAddr.addressLine1}${selectedAddr.addressLine2 ? ', ' + selectedAddr.addressLine2 : ''}, ${selectedAddr.city}, ${selectedAddr.state} - ${selectedAddr.zipCode}`
         : `${newAddress.addressLine1}${newAddress.addressLine2 ? ', ' + newAddress.addressLine2 : ''}, ${newAddress.city}, ${newAddress.state} - ${newAddress.zipCode}`;
 
+      const deliveryLocation = selectedAddr
+        ? selectedAddr.location
+        : { type: 'Point', coordinates: [newAddress.longitude ?? 0, newAddress.latitude ?? 0] };
+
       const orderData = {
-        items: items.map((i) => ({ 
-          food: i.foodId, 
-          quantity: i.quantity, 
+        items: items.map((i) => ({
+          food: i.foodId,
+          quantity: i.quantity,
           price: i.price,
           selectedSize: i.selectedSize,
-          selectedAddOns: i.selectedAddOns 
+          selectedAddOns: i.selectedAddOns
         })),
         deliveryType,
         paymentMethod,
-        deliveryAddress: deliveryAddressStr,
-        deliveryAddressId: deliveryAddressId || undefined,
+        deliveryAddressStr, // Send string for history
+        deliveryAddress: deliveryAddressId || undefined, // Send ID for lookup
+        deliveryLocation,
         contact,
         subtotal,
         tax,
@@ -234,16 +239,49 @@ export default function CheckoutPage() {
               const errorMsg = error.response?.data?.message || 'Payment verification failed. Please contact support.';
               setError(errorMsg);
               addToast(errorMsg, 'error');
+              // Mark order as failed on backend
+              try {
+                await paymentAPI.cancel({ orderId, paymentId });
+              } catch (e) {
+                console.error('Failed to mark order as cancelled:', e);
+              }
             }
           },
           modal: {
-            ondismiss: () => {
+            ondismiss: async () => {
               setError('Payment cancelled. Please try again.');
               addToast('Payment cancelled', 'error');
+              // Mark order as failed on backend
+              try {
+                const orderIdVal = orderId;
+                const paymentIdVal = paymentId;
+                await paymentAPI.cancel({ orderId: orderIdVal, paymentId: paymentIdVal });
+              } catch (e) {
+                console.error('Failed to mark order as cancelled:', e);
+              }
             },
           },
           theme: {
             color: '#D4AF37',
+          },
+          config: {
+            display: {
+              blocks: {
+                banks: {
+                  name: 'All Payment Methods',
+                  instruments: [
+                    { method: 'upi' },
+                    { method: 'card' },
+                    { method: 'netbanking' },
+                    { method: 'wallet' },
+                  ],
+                },
+              },
+              sequence: ['block.banks'],
+              preferences: {
+                show_default_blocks: true,
+              },
+            },
           },
         };
 
@@ -385,7 +423,7 @@ export default function CheckoutPage() {
                       <label className="block text-sm font-semibold mb-2">Address Line 2</label>
                       <input type="text" value={newAddress.addressLine2} onChange={(e) => setNewAddress({ ...newAddress, addressLine2: e.target.value })} placeholder="Area, Landmark (optional)" className="w-full px-4 py-2.5 rounded-lg bg-dark-input border border-primary-gold/30 text-white focus:outline-none focus:border-primary-gold" />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold mb-2">City *</label>
                         <input type="text" value={newAddress.city} onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })} placeholder="Hyderabad" className="w-full px-4 py-2.5 rounded-lg bg-dark-input border border-primary-gold/30 text-white focus:outline-none focus:border-primary-gold" />
@@ -395,7 +433,7 @@ export default function CheckoutPage() {
                         <input type="text" value={newAddress.state} onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })} placeholder="Telangana" className="w-full px-4 py-2.5 rounded-lg bg-dark-input border border-primary-gold/30 text-white focus:outline-none focus:border-primary-gold" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold mb-2">PIN Code *</label>
                         <input type="text" value={newAddress.zipCode} onChange={(e) => setNewAddress({ ...newAddress, zipCode: e.target.value })} placeholder="500001" className="w-full px-4 py-2.5 rounded-lg bg-dark-input border border-primary-gold/30 text-white focus:outline-none focus:border-primary-gold" />

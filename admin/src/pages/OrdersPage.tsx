@@ -5,7 +5,16 @@ import { useToast } from '@/lib/ToastContext';
 import AdminSelect from '@/components/AdminSelect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface OrderItem { food?: { name: string; image?: string; price?: number }; name?: string; quantity: number; price: number; totalPrice?: number; selectedSize?: string; specialInstructions?: string; }
+interface OrderItem {
+  food?: any;
+  name?: string;
+  quantity: number;
+  price: number;
+  totalPrice?: number;
+  selectedSize?: string;
+  selectedAddOns?: string[];
+  specialInstructions?: string;
+}
 interface DeliveryAddress { addressLine1: string; addressLine2?: string; city: string; state: string; zipCode: string; phoneNumber?: string; label?: string; location?: { coordinates: [number, number] }; }
 interface Order { _id: string; orderId?: string; user?: { name?: string; email?: string; phone?: string }; items: OrderItem[]; deliveryType: string; deliveryAddress?: DeliveryAddress; deliveryLocation?: { coordinates: [number, number] }; subtotal?: number; tax?: number; deliveryFee?: number; discount?: number; total?: number; totalAmount?: number; couponCode?: string; paymentMethod?: string; paymentStatus?: string; status: string; statusTimeline?: { status: string; timestamp: string; notes?: string }[]; notes?: string; createdAt: string; }
 
@@ -43,12 +52,25 @@ function getTotal(order: Order) { return Number(order.total || order.totalAmount
 function getCustomer(order: Order) { return order.user?.name || 'Unknown Customer'; }
 function getPhone(order: Order) { return order.user?.phone || order.deliveryAddress?.phoneNumber || ''; }
 function getItemName(item: OrderItem): string {
-  // Try to get name from populated food object first
   if (typeof item.food === 'object' && item.food?.name) return item.food.name;
-  // Fallback to name field if available
   if (item.name) return item.name;
-  // Default fallback
   return 'Item';
+}
+function getSizeName(item: OrderItem): string | null {
+  if (item.selectedSize && typeof item.food === 'object' && item.food?.sizes) {
+    const size = item.food.sizes.find((s: any) => s._id === item.selectedSize || s.id === item.selectedSize || s.name === item.selectedSize);
+    return size ? size.label || size.name : item.selectedSize;
+  }
+  return item.selectedSize || null;
+}
+function getAddOnNames(item: OrderItem): string[] {
+  if (item.selectedAddOns && item.selectedAddOns.length > 0 && typeof item.food === 'object' && item.food?.addOns) {
+    return item.selectedAddOns.map((id: string) => {
+      const addon = item.food.addOns.find((a: any) => a._id === id || a.id === id || a.name === id);
+      return addon ? addon.name : id;
+    });
+  }
+  return [];
 }
 function getAddress(order: Order): string {
   const a = order.deliveryAddress;
@@ -80,10 +102,10 @@ function printInvoice(order: Order) {
   <br/><table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
   <tbody>${items}</tbody>
   <tfoot>
-    <tr class="tr"><td colspan="3">Subtotal</td><td style="text-align:right">₹${Number(order.subtotal||0).toFixed(2)}</td></tr>
-    <tr><td colspan="3">Tax(5%)</td><td style="text-align:right">₹${Number(order.tax||0).toFixed(2)}</td></tr>
-    ${order.deliveryFee?`<tr><td colspan="3">Delivery Fee</td><td style="text-align:right">₹${Number(order.deliveryFee).toFixed(2)}</td></tr>`:''}
-    ${order.discount?`<tr><td colspan="3" style="color:green">Discount</td><td style="text-align:right;color:green">-₹${Number(order.discount).toFixed(2)}</td></tr>`:''}
+    <tr class="tr"><td colspan="3">Subtotal</td><td style="text-align:right">₹${Number(order.subtotal || 0).toFixed(2)}</td></tr>
+    <tr><td colspan="3">Tax(5%)</td><td style="text-align:right">₹${Number(order.tax || 0).toFixed(2)}</td></tr>
+    ${order.deliveryFee ? `<tr><td colspan="3">Delivery Fee</td><td style="text-align:right">₹${Number(order.deliveryFee).toFixed(2)}</td></tr>` : ''}
+    ${order.discount ? `<tr><td colspan="3" style="color:green">Discount</td><td style="text-align:right;color:green">-₹${Number(order.discount).toFixed(2)}</td></tr>` : ''}
     <tr class="tr"><td colspan="3"><strong>TOTAL</strong></td><td style="text-align:right"><strong>₹${getTotal(order).toFixed(2)}</strong></td></tr>
   </tfoot></table>
   <br/><p style="font-size:12px;color:#888">Thank you for ordering from Rachabanda Ruchulu!</p>
@@ -172,18 +194,27 @@ function OrderModal({ order, onClose, onStatusChange }: { order: Order; onClose:
                   </tr>
                 </thead>
                 <tbody>
-                  {order.items.map((item, i) => (
-                    <tr key={i} className="border-t border-white/5">
-                      <td className="px-4 py-3">
-                        <p className="text-white">{getItemName(item)}</p>
-                        {item.selectedSize && <p className="text-xs text-gray-500">Size: {item.selectedSize}</p>}
-                        {item.specialInstructions && <p className="text-xs text-yellow-400">Note: {item.specialInstructions}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-300">{item.quantity}</td>
-                      <td className="px-4 py-3 text-right text-gray-400">₹{Number(item.price).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right text-white font-semibold">₹{Number(item.totalPrice || item.price * item.quantity).toFixed(2)}</td>
-                    </tr>
-                  ))}
+                  {order.items.map((item, i) => {
+                    const sizeName = getSizeName(item);
+                    const addonNames = getAddOnNames(item);
+                    return (
+                      <tr key={i} className="border-t border-white/5">
+                        <td className="px-4 py-3">
+                          <p className="text-white font-medium">{getItemName(item)}</p>
+                          {sizeName && <p className="text-[10px] text-gray-500 mt-0.5">Size: <span className="text-primary-gold/80">{sizeName}</span></p>}
+                          {addonNames.length > 0 && (
+                            <p className="text-[10px] text-gray-500">
+                              Add-ons: <span className="text-gray-400">{addonNames.join(', ')}</span>
+                            </p>
+                          )}
+                          {item.specialInstructions && <p className="text-[10px] text-yellow-500/80 italic mt-0.5">Note: {item.specialInstructions}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-300">{item.quantity}</td>
+                        <td className="px-4 py-3 text-right text-gray-400 font-mono">₹{Number(item.price).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-white font-bold font-mono">₹{Number(item.totalPrice || item.price * item.quantity).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -193,7 +224,7 @@ function OrderModal({ order, onClose, onStatusChange }: { order: Order; onClose:
           <section>
             <h3 className="text-primary-gold font-semibold text-xs mb-3 uppercase tracking-widest">💳 Payment</h3>
             <div className="grid grid-cols-3 gap-2 mb-3">
-              {[['Subtotal', `₹${Number(order.subtotal||0).toFixed(2)}`],['Tax (5%)', `₹${Number(order.tax||0).toFixed(2)}`],['Delivery', `₹${Number(order.deliveryFee||0).toFixed(2)}`],['Discount', order.discount ? `-₹${Number(order.discount).toFixed(2)}` : '—'],['Method', order.paymentMethod?.toUpperCase()||'—'],['Pay Status', order.paymentStatus||'—']].map(([label, val]) => (
+              {[['Subtotal', `₹${Number(order.subtotal || 0).toFixed(2)}`], ['Tax (5%)', `₹${Number(order.tax || 0).toFixed(2)}`], ['Delivery', `₹${Number(order.deliveryFee || 0).toFixed(2)}`], ['Discount', order.discount ? `-₹${Number(order.discount).toFixed(2)}` : '—'], ['Method', order.paymentMethod?.toUpperCase() || '—'], ['Pay Status', order.paymentStatus || '—']].map(([label, val]) => (
                 <div key={label} className="bg-white/5 rounded-xl p-3">
                   <p className="text-xs text-gray-500">{label}</p>
                   <p className="text-white text-sm font-medium mt-0.5">{val}</p>
@@ -229,7 +260,11 @@ function OrderModal({ order, onClose, onStatusChange }: { order: Order; onClose:
             {order.status !== 'delivered' && order.status !== 'cancelled' && (
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">Update Status</label>
-                <AdminSelect value={order.status} onChange={(v) => onStatusChange(order._id, v)} options={STATUS_OPTIONS} />
+                <AdminSelect
+                  value={order.status}
+                  onChange={(v) => onStatusChange(order._id, v)}
+                  options={STATUS_OPTIONS}
+                />
               </div>
             )}
             <button onClick={() => printInvoice(order)} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium transition-colors">
@@ -251,7 +286,7 @@ function OrderModal({ order, onClose, onStatusChange }: { order: Order; onClose:
                     disabled={!waNumber.trim()}
                     className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-lg transition-colors"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
                     Send
                   </button>
                 </div>
@@ -388,9 +423,19 @@ export default function AdminOrdersPage() {
                       <p className="text-white text-sm">{getCustomer(order)}</p>
                       <p className="text-gray-500 text-xs capitalize">{order.deliveryType}</p>
                     </td>
-                    <td className="px-5 py-4 text-xs text-gray-400 max-w-[180px]">
-                      <p className="truncate">{order.items.map((i) => `${getItemName(i)} ×${i.quantity}`).join(', ')}</p>
-                      <p className="text-gray-600">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                    <td className="px-5 py-4 text-xs text-gray-400 max-w-[200px]">
+                      <div className="space-y-1">
+                        {order.items.map((i, idx) => {
+                          const sizeName = getSizeName(i);
+                          return (
+                            <div key={idx} className="flex flex-col">
+                              <span className="truncate text-white/90">{getItemName(i)} ×{i.quantity}</span>
+                              {sizeName && <span className="text-[9px] text-gray-500 font-medium capitalize">Size: {sizeName}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-primary-gold/50 text-[10px] mt-1.5 font-bold">{order.items.length} ITEM{order.items.length !== 1 ? 'S' : ''}</p>
                     </td>
                     <td className="px-5 py-4 font-bold text-white">₹{getTotal(order).toFixed(2)}</td>
                     <td className="px-5 py-4">

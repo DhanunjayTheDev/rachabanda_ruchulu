@@ -73,6 +73,8 @@ router.post('/', auth, async (req, res) => {
       })),
       deliveryType,
       deliveryAddress: deliveryAddressId,
+      deliveryAddressStr: req.body.deliveryAddressStr,
+      deliveryLocation: req.body.deliveryLocation,
       subtotal,
       tax,
       deliveryFee,
@@ -101,6 +103,16 @@ router.post('/', auth, async (req, res) => {
 
     // Populate food details before returning
     await order.populate('items.food');
+    await order.populate('user', 'name email phone');
+    if (order.deliveryAddress) {
+      await order.populate('deliveryAddress');
+    }
+
+    const { broadcastOrdersUpdate } = require('../utils/realtime');
+    // For online payments, don't notify admin until payment is verified
+    if (order.paymentMethod === 'cod') {
+      broadcastOrdersUpdate('created', order);
+    }
 
     res.status(201).json({
       success: true,
@@ -114,7 +126,7 @@ router.post('/', auth, async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.userId }).populate('items.food').sort({ createdAt: -1 });
+    const orders = await Order.find({ user: req.userId }).populate('items.food').populate('deliveryAddress').sort({ createdAt: -1 });
 
     res.json({ success: true, orders });
   } catch (error) {
@@ -164,6 +176,15 @@ router.put('/:id/status', adminAuth, async (req, res) => {
     });
 
     await order.save();
+
+    // Populate necessary fields before broadcasting
+    await order.populate('user', 'name email phone');
+    if (order.deliveryAddress) {
+      await order.populate('deliveryAddress');
+    }
+
+    const { broadcastOrdersUpdate } = require('../utils/realtime');
+    broadcastOrdersUpdate('statusUpdate', order);
 
     res.json({ success: true, order });
   } catch (error) {

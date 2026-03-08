@@ -62,7 +62,33 @@ router.get('/', auth, async (req, res) => {
       return res.json({ success: true, cart: { items: [], subtotal: 0 } });
     }
 
-    res.json({ success: true, cart });
+    // Enrich cart items with size/addon names
+    const enrichedCart = cart.toObject();
+    enrichedCart.items = enrichedCart.items.map((item) => {
+      if (!item.food) return item;
+
+      // Resolve size name
+      if (item.selectedSize && item.food.sizes) {
+        const sizeObj = item.food.sizes.find(
+          (s) => s._id.toString() === item.selectedSize || s.name === item.selectedSize
+        );
+        item.selectedSizeName = sizeObj ? sizeObj.name : item.selectedSize;
+      }
+
+      // Resolve addon names
+      if (item.selectedAddOns && item.selectedAddOns.length > 0 && item.food.addOns) {
+        item.selectedAddOnNames = item.selectedAddOns.map((addonId) => {
+          const addonObj = item.food.addOns.find(
+            (a) => a._id.toString() === addonId || a.name === addonId
+          );
+          return addonObj ? addonObj.name : addonId;
+        });
+      }
+
+      return item;
+    });
+
+    res.json({ success: true, cart: enrichedCart });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

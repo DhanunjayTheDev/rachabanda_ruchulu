@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminNotificationStore, AdminNotification } from '@/store/useAdminNotificationStore';
 import { useAdminRealtimeOrders, useAdminRealtimeGeneral } from '@/hooks/useAdminRealtime';
 import { playNotificationSound, startOrderAlertSound, stopOrderAlertSound } from '@/lib/notificationSound';
+import { ordersAPI } from '@/lib/api';
 
 function timeAgo(timestamp: string) {
   const diff = Date.now() - new Date(timestamp).getTime();
@@ -60,18 +61,27 @@ function OrderAlertBanner({
         </div>
       </div>
       <div className="flex gap-2 mt-3">
-        <a
-          href="/orders"
-          onClick={() => onDismiss(order._id)}
-          className="flex-1 bg-white text-orange-700 font-bold text-xs py-1.5 rounded-lg text-center hover:bg-orange-50 transition-colors"
-        >
-          View &amp; Accept Order
-        </a>
         <button
-          onClick={() => onDismiss(order._id)}
-          className="px-3 bg-orange-700/50 text-white text-xs py-1.5 rounded-lg hover:bg-orange-700 transition-colors"
+          onClick={async () => {
+            try {
+              await ordersAPI.updateStatus(order._id, 'confirmed');
+              onDismiss(order._id);
+            } catch (err) { console.error(err); }
+          }}
+          className="flex-1 bg-green-500 hover:bg-green-400 text-white font-bold text-xs py-2 rounded-lg text-center transition-colors"
         >
-          Dismiss
+          ✅ Accept Order
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              await ordersAPI.updateStatus(order._id, 'cancelled');
+              onDismiss(order._id);
+            } catch (err) { console.error(err); }
+          }}
+          className="px-4 bg-red-900/80 hover:bg-black/50 border border-red-500/50 text-white text-xs py-2 rounded-lg transition-colors"
+        >
+          ✕ Reject
         </button>
       </div>
     </motion.div>

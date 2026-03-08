@@ -15,4 +15,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  optimizeDeps: {
+    force: true, // Forces Vite to re-bundle and clear the map library error
+  },
 });
