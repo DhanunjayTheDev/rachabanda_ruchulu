@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import useStore from '@/store/useStore';
-import { cartAPI, settingsAPI } from '@/lib/api';
+import { cartAPI, settingsAPI, foodAPI } from '@/lib/api';
+
+interface FoodDetailsMap {
+  [key: string]: {
+    sizes?: { _id: string; name: string; price: number }[];
+    addOns?: { _id: string; name: string; price: number }[];
+  };
+}
 
 export default function CartPage() {
   const items = useStore((s) => s.items);
@@ -12,6 +19,7 @@ export default function CartPage() {
   const syncCartFromServer = useStore((s) => s.syncCartFromServer);
 
   const [settings, setSettings] = useState<any>(null);
+  const [foodDetailsMap, setFoodDetailsMap] = useState<FoodDetailsMap>({});
 
   useEffect(() => {
     settingsAPI.get()
@@ -25,6 +33,29 @@ export default function CartPage() {
     }
   }, [isLoggedIn, syncCartFromServer]);
 
+  // Fetch food details for all items to get size/addon names
+  useEffect(() => {
+    const uniqueFoodIds = [...new Set(items.map(item => item.foodId))];
+    
+    if (uniqueFoodIds.length > 0) {
+      const detailsMap: FoodDetailsMap = {};
+      
+      Promise.all(
+        uniqueFoodIds.map(foodId =>
+          foodAPI.getById(foodId)
+            .then((res) => {
+              const food = res.data?.food || res.data;
+              detailsMap[foodId] = {
+                sizes: food.sizes,
+                addOns: food.addOns,
+              };
+            })
+            .catch(() => {})
+        )
+      ).then(() => setFoodDetailsMap(detailsMap));
+    }
+  }, [items]);
+
   const subtotal = getTotalPrice();
   const deliveryFee = subtotal > 0 ? (settings?.deliveryCharge ?? 30) : 0;
   const tax = Math.floor(subtotal * ((settings?.taxRate ?? 5) / 100));
@@ -36,6 +67,17 @@ export default function CartPage() {
     } else {
       updateQuantity(itemId, qty);
     }
+  };
+
+  const getSizeName = (foodId: string, sizeId: string) => {
+    return foodDetailsMap[foodId]?.sizes?.find(s => s._id === sizeId)?.name || sizeId;
+  };
+
+  const getAddonNames = (foodId: string, addonIds: string[]) => {
+    if (!addonIds || addonIds.length === 0) return [];
+    return addonIds
+      .map(id => foodDetailsMap[foodId]?.addOns?.find(a => a._id === id)?.name || id)
+      .filter(Boolean);
   };
 
   return (
@@ -63,9 +105,15 @@ export default function CartPage() {
                     <div className="flex-1">
                       <h3 className="text-xl font-bold mb-1">{item.name}</h3>
                       <p className="text-primary-gold font-semibold">₹{item.price}</p>
-                      {item.selectedSize && <p className="text-gray-500 text-xs">Size: {item.selectedSize}</p>}
+                      {item.selectedSize && (
+                        <p className="text-gray-500 text-xs">
+                          Size: <span className="text-gray-400">{getSizeName(item.foodId, item.selectedSize)}</span>
+                        </p>
+                      )}
                       {item.selectedAddOns && item.selectedAddOns.length > 0 && (
-                        <p className="text-gray-500 text-xs">Add-ons: {item.selectedAddOns.join(', ')}</p>
+                        <p className="text-gray-500 text-xs">
+                          Add-ons: <span className="text-gray-400">{getAddonNames(item.foodId, item.selectedAddOns).join(', ')}</span>
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-4">

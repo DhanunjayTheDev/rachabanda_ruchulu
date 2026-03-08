@@ -1,6 +1,16 @@
+const mongoose = require('mongoose');
 const Food = require('../models/Food');
 const { broadcastFoodsUpdate } = require('../utils/realtime');
 const { deleteImageFromCloudinary } = require('../utils/cloudinaryHelper');
+
+// Helper function to ensure sizes and addOns have _id
+const ensureIdsForSizesAndAddOns = (items) => {
+  if (!items || !Array.isArray(items)) return items;
+  return items.map(item => ({
+    ...item,
+    _id: item._id || new mongoose.Types.ObjectId(),
+  }));
+};
 
 // Get all foods with filters
 const getAllFoods = async (req, res) => {
@@ -99,6 +109,10 @@ const createFood = async (req, res) => {
       }
     }
 
+    // Ensure all sizes and addOns have _id
+    parsedAddOns = ensureIdsForSizesAndAddOns(parsedAddOns);
+    parsedSizes = ensureIdsForSizesAndAddOns(parsedSizes);
+
     const food = new Food({
       name,
       description,
@@ -143,7 +157,8 @@ const updateFood = async (req, res) => {
     
     if (addOns) {
       try {
-        updateData.addOns = JSON.parse(addOns);
+        const parsedAddOns = JSON.parse(addOns);
+        updateData.addOns = ensureIdsForSizesAndAddOns(parsedAddOns);
       } catch (err) {
         // Keep existing addOns if parse fails
       }
@@ -151,7 +166,8 @@ const updateFood = async (req, res) => {
 
     if (sizes) {
       try {
-        updateData.sizes = JSON.parse(sizes);
+        const parsedSizes = JSON.parse(sizes);
+        updateData.sizes = ensureIdsForSizesAndAddOns(parsedSizes);
       } catch (err) {
         // Keep existing sizes if parse fails
       }

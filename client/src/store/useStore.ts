@@ -95,8 +95,10 @@ const useStore = create<CartStore>()(
         cartAPI.add({
           foodId: item.foodId,
           quantity: item.quantity,
+          price: item.price,
           selectedSize: item.selectedSize,
           selectedAddOns: item.selectedAddOns,
+          specialInstructions: item.specialInstructions,
         }).then((res) => {
           if (res.data?.cart?.items) {
             const normalizeAddOns = (addOns?: string[]) =>
@@ -167,6 +169,15 @@ const useStore = create<CartStore>()(
             item.foodId === foodId ? { ...item, ...updates } : item
           ),
         }));
+        
+        // Find the item and sync with server
+        const state = get();
+        const item = state.items.find((i) => i.foodId === foodId);
+        if (item?._id) {
+          cartAPI.update(item._id, updates).catch((error) => {
+            console.error('Failed to update cart item on server:', error);
+          });
+        }
       },
 
       clearCart: () => {

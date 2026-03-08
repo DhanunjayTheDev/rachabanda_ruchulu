@@ -92,7 +92,11 @@ const foodSchema = new mongoose.Schema(
     },
     sizes: [
       {
-        _id: mongoose.Schema.Types.ObjectId,
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          auto: true,
+          default: () => new mongoose.Types.ObjectId(),
+        },
         name: String,
         label: String,
         price: Number,
@@ -101,7 +105,11 @@ const foodSchema = new mongoose.Schema(
     ],
     addOns: [
       {
-        _id: mongoose.Schema.Types.ObjectId,
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          auto: true,
+          default: () => new mongoose.Types.ObjectId(),
+        },
         name: String,
         price: Number,
       },

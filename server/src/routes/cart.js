@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.post('/add', auth, async (req, res) => {
   try {
-    const { foodId, quantity, selectedSize, selectedAddOns, specialInstructions } = req.body;
+    const { foodId, quantity, price, selectedSize, selectedAddOns, specialInstructions } = req.body;
 
     const food = await Food.findById(foodId);
     if (!food) {
@@ -32,23 +32,24 @@ router.post('/add', auth, async (req, res) => {
 
     if (existingItem) {
       existingItem.quantity += quantity;
-      existingItem.totalPrice = existingItem.price * existingItem.quantity;
+      existingItem.totalPrice = (price || food.price) * existingItem.quantity;
     } else {
       cart.items.push({
         food: foodId,
         quantity,
-        price: food.price,
+        price: price || food.price,
         selectedSize,
         selectedAddOns,
         specialInstructions,
-        totalPrice: food.price * quantity,
+        totalPrice: (price || food.price) * quantity,
       });
     }
 
     cart.subtotal = cart.items.reduce((sum, item) => sum + item.totalPrice, 0);
     await cart.save();
 
-    res.json({ success: true, cart });
+    const fullCart = await Cart.findById(cart._id).populate('items.food');
+    res.json({ success: true, cart: fullCart });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -69,7 +70,7 @@ router.get('/', auth, async (req, res) => {
 
 router.put('/update/:itemId', auth, async (req, res) => {
   try {
-    const { quantity } = req.body;
+    const { quantity, price, selectedSize, selectedAddOns, specialInstructions } = req.body;
 
     const cart = await Cart.findOne({ user: req.userId });
     const item = cart.items.id(req.params.itemId);
@@ -78,13 +79,21 @@ router.put('/update/:itemId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Cart item not found' });
     }
 
-    item.quantity = quantity;
-    item.totalPrice = item.price * quantity;
+    // Update all provided fields
+    if (quantity !== undefined) item.quantity = quantity;
+    if (price !== undefined) item.price = price;
+    if (selectedSize !== undefined) item.selectedSize = selectedSize;
+    if (selectedAddOns !== undefined) item.selectedAddOns = selectedAddOns;
+    if (specialInstructions !== undefined) item.specialInstructions = specialInstructions;
+
+    // Recalculate total price
+    item.totalPrice = item.price * item.quantity;
 
     cart.subtotal = cart.items.reduce((sum, item) => sum + item.totalPrice, 0);
     await cart.save();
 
-    res.json({ success: true, cart });
+    const fullCart = await Cart.findById(cart._id).populate('items.food');
+    res.json({ success: true, cart: fullCart });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -103,7 +112,8 @@ router.delete('/remove/:itemId', auth, async (req, res) => {
     cart.subtotal = cart.items.reduce((sum, item) => sum + item.totalPrice, 0);
     await cart.save();
 
-    res.json({ success: true, cart });
+    const fullCart = await Cart.findById(cart._id).populate('items.food');
+    res.json({ success: true, cart: fullCart });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
