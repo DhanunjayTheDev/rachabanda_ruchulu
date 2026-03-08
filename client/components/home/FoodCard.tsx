@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import useStore from '@/store/useStore';
 import LoginDialog from '@/components/modals/LoginDialog';
+import AddToCartModal from '@/components/modals/AddToCartModal';
 import { useToast } from '@/lib/ToastContext';
 
 interface FoodCardProps {
@@ -12,12 +13,13 @@ interface FoodCardProps {
   price: number;
   image: string;
   rating: number;
-  isVegetarian: boolean;
+  isVegetarian?: boolean;
+  foodType?: string;
   categoryName: string;
   description?: string;
 }
 
-const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName, description }: FoodCardProps) => {
+const FoodCard = ({ id, name, price, image, rating, isVegetarian, foodType, categoryName, description }: FoodCardProps) => {
   const addToCart = useStore((s) => s.addToCart);
   const addToWishlist = useStore((s) => s.addToWishlist);
   const removeFromWishlist = useStore((s) => s.removeFromWishlist);
@@ -25,7 +27,23 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName, 
   const isInCart = useStore((s) => s.isInCart);
   const isLoggedIn = useStore((s) => s.isLoggedIn());
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [showAddToCartModal, setShowAddToCartModal] = useState(false);
   const { addToast } = useToast();
+
+  const getFoodTypeDisplay = () => {
+    const typeMap: Record<string, any> = {
+      'veg': { emoji: '🥬', label: 'Veg', color: 'bg-green-500/90' },
+      'vegan': { emoji: '🌱', label: 'Vegan', color: 'bg-green-600/90' },
+      'jain': { emoji: '☸️', label: 'Jain', color: 'bg-green-500/90' },
+      'non-veg': { emoji: '🍗', label: 'Non-Veg', color: 'bg-red-500/90' },
+      'egg-free': { emoji: '🚫', label: 'Egg-Free', color: 'bg-blue-500/90' },
+      'gluten-free': { emoji: '🌾', label: 'Gluten-Free', color: 'bg-yellow-600/90' },
+      'sugar-free': { emoji: '🍯', label: 'Sugar-Free', color: 'bg-orange-600/90' },
+    };
+    
+    const type = foodType || (isVegetarian ? 'veg' : 'non-veg');
+    return typeMap[type] || { emoji: '🍽️', label: 'Food', color: 'bg-gray-500/90' };
+  };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -38,9 +56,8 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName, 
       return;
     }
 
-    // Add to cart
-    addToCart({ foodId: id, name, price, quantity: 1, image });
-    addToast(`${name} added to cart!`, 'success');
+    // Open add to cart modal to select sizes/addons
+    setShowAddToCartModal(true);
   };
 
   const handleWishlist = (e: React.MouseEvent) => {
@@ -81,15 +98,14 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName, 
 
           {/* Badge */}
           <div className="absolute top-3 right-3">
-            {isVegetarian ? (
-              <div className="bg-green-500/90 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                🌱 Veg
-              </div>
-            ) : (
-              <div className="bg-red-500/90 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                🍖 Non-Veg
-              </div>
-            )}
+            {(() => {
+              const typeInfo = getFoodTypeDisplay();
+              return (
+                <div className={`${typeInfo.color} text-white px-3 py-1 rounded-full text-xs font-semibold`}>
+                  {typeInfo.emoji} {typeInfo.label}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Rating */}
@@ -145,9 +161,17 @@ const FoodCard = ({ id, name, price, image, rating, isVegetarian, categoryName, 
         open={showLoginDialog}
         onClose={() => setShowLoginDialog(false)}
         onLoginSuccess={() => {
-          addToCart({ foodId: id, name, price, quantity: 1, image });
-          addToast(`${name} added to cart!`, 'success');
+          setShowAddToCartModal(true);
         }}
+      />
+
+      {/* Add to Cart Modal */}
+      <AddToCartModal
+        open={showAddToCartModal}
+        onClose={() => setShowAddToCartModal(false)}
+        foodId={id}
+        name={name}
+        initialPrice={price}
       />
     </>
   );

@@ -33,11 +33,11 @@ export default function CartPage() {
   const tax = Math.floor(subtotal * ((settings?.taxRate ?? 5) / 100));
   const total = subtotal + deliveryFee + tax;
 
-  const handleUpdateQty = (foodId: string, qty: number) => {
+  const handleUpdateQty = (itemId: string, qty: number) => {
     if (qty <= 0) {
-      removeFromCart(foodId);
+      removeFromCart(itemId);
     } else {
-      updateQuantity(foodId, qty);
+      updateQuantity(itemId, qty);
     }
   };
 
@@ -53,8 +53,11 @@ export default function CartPage() {
           {items.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-4">
-                {items.map((item) => (
-                  <div key={item.foodId} className="card flex items-center gap-6">
+                {items.map((item, index) => {
+                  const itemKey = item._id || `${item.foodId}-${index}`;
+                  const itemId = item._id || item.foodId;
+                  return (
+                  <div key={itemKey} className="card flex items-center gap-6">
                     {item.image && item.image.startsWith('http') ? (
                       <img src={item.image} alt={item.name} className="w-20 h-20 rounded-xl object-cover" loading="lazy" />
                     ) : (
@@ -64,18 +67,22 @@ export default function CartPage() {
                       <h3 className="text-xl font-bold mb-1">{item.name}</h3>
                       <p className="text-primary-gold font-semibold">₹{item.price}</p>
                       {item.selectedSize && <p className="text-gray-500 text-xs">Size: {item.selectedSize}</p>}
+                      {item.selectedAddOns && item.selectedAddOns.length > 0 && (
+                        <p className="text-gray-500 text-xs">Add-ons: {item.selectedAddOns.join(', ')}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-4">
-                      <button onClick={() => handleUpdateQty(item.foodId, item.quantity - 1)} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">−</button>
+                      <button onClick={() => handleUpdateQty(itemId, item.quantity - 1)} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">−</button>
                       <span className="text-lg font-bold w-8 text-center">{item.quantity}</span>
-                      <button onClick={() => handleUpdateQty(item.foodId, item.quantity + 1)} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">+</button>
+                      <button onClick={() => handleUpdateQty(itemId, item.quantity + 1)} className="w-10 h-10 rounded-lg bg-primary-gold/20 hover:bg-primary-gold/30 text-primary-gold font-bold">+</button>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-lg mb-2">₹{item.price * item.quantity}</p>
-                      <button onClick={() => removeFromCart(item.foodId)} className="text-red-400 hover:text-red-300 text-sm">Remove</button>
+                      <button onClick={() => removeFromCart(itemId)} className="text-red-400 hover:text-red-300 text-sm">Remove</button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Order Summary */}

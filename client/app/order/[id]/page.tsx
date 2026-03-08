@@ -86,7 +86,7 @@ export default function OrderTrackingPage({ params }: { params: { id: string } }
     );
   }
 
-  const currentStatus = order.ordersStatus || order.status || 'placed';
+  const currentStatus = order.status || 'placed';
   const activeStep = getActiveStep(currentStatus);
   const isCancelled = currentStatus === 'cancelled';
   const isDelivered = currentStatus === 'delivered';

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { categoryAPI } from '@/lib/api';
+import { useRealtimeCategories } from '@/hooks/useRealtime';
 
 const defaultEmojis: Record<string, string> = {
   biryani: '🍚', starters: '🍗', meals: '🍽️', snacks: '🍟', beverages: '🥤',
@@ -11,6 +12,21 @@ const defaultEmojis: Record<string, string> = {
 const CategoriesSection = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Real-time category updates
+  const handleCategoriesUpdate = useCallback((action: string, data: any) => {
+    if (action === 'created') {
+      setCategories((prev) => [...prev, data]);
+    } else if (action === 'updated') {
+      setCategories((prev) =>
+        prev.map((cat) => (cat._id === data._id ? { ...cat, ...data } : cat))
+      );
+    } else if (action === 'deleted') {
+      setCategories((prev) => prev.filter((cat) => cat._id !== data._id));
+    }
+  }, []);
+
+  useRealtimeCategories(handleCategoriesUpdate);
 
   useEffect(() => {
     const fetchCategories = async () => {

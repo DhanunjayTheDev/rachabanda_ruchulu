@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { paymentsAPI } from '@/lib/api';
+import { paymentsAPI, ordersAPI } from '@/lib/api';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([]);
@@ -13,9 +13,39 @@ export default function PaymentsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [paymentsRes, revenueRes] = await Promise.allSettled([paymentsAPI.getAll(), paymentsAPI.getRevenue()]);
-        if (paymentsRes.status === 'fulfilled') setPayments(paymentsRes.value.data?.payments || paymentsRes.value.data || []);
-        if (revenueRes.status === 'fulfilled') setRevenueData(revenueRes.value.data?.revenue || revenueRes.value.data || []);
+        // Fetch both payments and orders to get complete payment data
+        const [paymentsRes, revenueRes, ordersRes] = await Promise.allSettled([
+          paymentsAPI.getAll(),
+          paymentsAPI.getRevenue(),
+          ordersAPI.getAll(),
+        ]);
+        
+        // Get payments from Payment model
+        if (paymentsRes.status === 'fulfilled') {
+          setPayments(paymentsRes.value.data?.payments || paymentsRes.value.data || []);
+        }
+        
+        // Get revenue stats
+        if (revenueRes.status === 'fulfilled') {
+          setRevenueData(revenueRes.value.data?.revenue || revenueRes.value.data || []);
+        }
+        
+        // If no payments from Payment model, use orders as payment records
+        if (paymentsRes.status === 'rejected' || !paymentsRes.value.data?.payments?.length) {
+          if (ordersRes.status === 'fulfilled') {
+            const orders = ordersRes.value.data?.orders || ordersRes.value.data || [];
+            const paymentRecords = orders.map((order: any) => ({
+              _id: order._id,
+              order: { orderId: order.orderId, _id: order._id },
+              user: order.user,
+              amount: order.total,
+              paymentMethod: order.paymentMethod,
+              status: order.paymentStatus || 'completed',
+              createdAt: order.createdAt,
+            }));
+            setPayments(paymentRecords);
+          }
+        }
       } catch {}
       setLoading(false);
     };
@@ -23,17 +53,19 @@ export default function PaymentsPage() {
   }, []);
 
   const filteredPayments = payments.filter((p: any) => {
-    const matchesFilter = filter === 'all' || p.status === filter;
+    const matchesFilter = filter === 'all' || p.paymentMethod === filter || p.status === filter;
+    const customerName = p.user?.name || p.customer || '';
+    const orderId = p.order?.orderId || p.orderId || '';
     const matchesSearch =
-      (p.customer || p.user?.name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (p.orderId || p.order?._id || '').toLowerCase().includes(search.toLowerCase()) ||
+      customerName.toLowerCase().includes(search.toLowerCase()) ||
+      orderId.toLowerCase().includes(search.toLowerCase()) ||
       (p._id || p.id || '').toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
   const totalRevenue = payments.filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
-  const onlineTotal = payments.filter((p: any) => p.method === 'online' && p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
-  const codTotal = payments.filter((p: any) => p.method === 'cod' && p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const onlineTotal = payments.filter((p: any) => (p.paymentMethod === 'razorpay' || p.paymentMethod === 'online') && p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const codTotal = payments.filter((p: any) => (p.paymentMethod === 'cod' || p.method === 'cod') && p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
   const statusColors: Record<string, string> = {
     completed: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -43,6 +75,7 @@ export default function PaymentsPage() {
   };
 
   const methodBadge: Record<string, string> = {
+    razorpay: 'bg-purple-500/10 text-purple-400',
     online: 'bg-purple-500/10 text-purple-400',
     cod: 'bg-orange-500/10 text-orange-400',
   };
@@ -89,10 +122,10 @@ export default function PaymentsPage() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by customer, order ID..." className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:border-primary-gold/50 focus:outline-none transition-all" />
         <div className="flex gap-2 flex-wrap">
-          {['all', 'completed', 'pending', 'failed', 'refunded'].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize ${filter === f ? 'bg-primary-gold/15 text-primary-gold border border-primary-gold/30' : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white'}`}>{f}</button>
-          ))}
-        </div>
+            {['all', 'completed', 'pending', 'failed', 'refunded', 'razorpay', 'cod'].map((f) => (
+              <button key={f} onClick={() => setFilter(f)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize ${filter === f ? 'bg-primary-gold/15 text-primary-gold border border-primary-gold/30' : 'bg-white/5 text-gray-400 border border-white/10 hover:text-white'}`}>{f === 'razorpay' ? 'Online' : f}</button>
+            ))}
+          </div>
       </div>
 
       <div className="glass rounded-2xl border border-white/10 overflow-hidden">
@@ -116,17 +149,17 @@ export default function PaymentsPage() {
                 {filteredPayments.map((payment: any) => (
                   <tr key={payment._id || payment.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                     <td className="py-3.5 px-5 text-sm text-gray-300 font-mono">{(payment._id || payment.id)?.slice(-8)}</td>
-                    <td className="py-3.5 px-5 text-sm text-primary-gold">{(payment.orderId || payment.order?._id || '')?.slice(-8)}</td>
-                    <td className="py-3.5 px-5 text-sm text-white">{payment.customer || payment.user?.name || 'Customer'}</td>
-                    <td className="py-3.5 px-5 text-sm text-white font-semibold">₹{payment.amount || 0}</td>
+                    <td className="py-3.5 px-5 text-sm text-primary-gold">{payment.order?.orderId || payment.orderId || 'N/A'}</td>
+                    <td className="py-3.5 px-5 text-sm text-white">{payment.user?.name || payment.customer || 'Customer'}</td>
+                    <td className="py-3.5 px-5 text-sm text-white font-semibold">₹{(payment.amount || 0).toLocaleString()}</td>
                     <td className="py-3.5 px-5">
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-medium uppercase ${methodBadge[payment.method] || 'bg-gray-500/10 text-gray-400'}`}>{payment.method || 'N/A'}</span>
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-medium uppercase ${methodBadge[payment.paymentMethod] || 'bg-gray-500/10 text-gray-400'}`}>{payment.paymentMethod?.toUpperCase() || 'N/A'}</span>
                     </td>
                     <td className="py-3.5 px-5">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-medium border capitalize ${statusColors[payment.status] || statusColors.pending}`}>{payment.status || 'pending'}</span>
                     </td>
                     <td className="py-3.5 px-5 text-sm text-gray-400">
-                      {payment.date || payment.createdAt ? new Date(payment.date || payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}
                     </td>
                   </tr>
                 ))}

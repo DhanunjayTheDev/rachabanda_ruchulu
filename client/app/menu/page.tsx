@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { foodAPI, categoryAPI } from '@/lib/api';
 import FoodCard from '@/components/home/FoodCard';
+import { useRealtimeFoods, useRealtimeCategories } from '@/hooks/useRealtime';
 
 interface Food {
   _id: string;
@@ -11,6 +12,8 @@ interface Food {
   image: string;
   rating: number;
   isVegetarian: boolean;
+  foodType?: string;
+  description?: string;
   category: { _id: string; name: string } | string;
 }
 
@@ -28,6 +31,35 @@ export default function MenuPage() {
   const [priceRange, setPriceRange] = useState(1000);
   const [sortBy, setSortBy] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Real-time food updates
+  const handleFoodsUpdate = useCallback((action: string, data: any) => {
+    if (action === 'created') {
+      setFoods((prev) => [...prev, data]);
+    } else if (action === 'updated') {
+      setFoods((prev) =>
+        prev.map((food) => (food._id === data._id ? { ...food, ...data } : food))
+      );
+    } else if (action === 'deleted') {
+      setFoods((prev) => prev.filter((food) => food._id !== data._id));
+    }
+  }, []);
+
+  // Real-time category updates
+  const handleCategoriesUpdate = useCallback((action: string, data: any) => {
+    if (action === 'created') {
+      setCategories((prev) => [...prev, data]);
+    } else if (action === 'updated') {
+      setCategories((prev) =>
+        prev.map((cat) => (cat._id === data._id ? { ...cat, ...data } : cat))
+      );
+    } else if (action === 'deleted') {
+      setCategories((prev) => prev.filter((cat) => cat._id !== data._id));
+    }
+  }, []);
+
+  useRealtimeFoods(handleFoodsUpdate);
+  useRealtimeCategories(handleCategoriesUpdate);
 
   useEffect(() => {
     const load = async () => {
@@ -214,6 +246,8 @@ export default function MenuPage() {
                       image={food.image}
                       rating={food.rating || 0}
                       isVegetarian={food.isVegetarian}
+                      foodType={food.foodType}
+                      description={food.description}
                       categoryName={getCategoryName(food.category)}
                     />
                   ))}

@@ -1,4 +1,6 @@
 const Food = require('../models/Food');
+const { broadcastFoodsUpdate } = require('../utils/realtime');
+const { deleteImageFromCloudinary } = require('../utils/cloudinaryHelper');
 
 // Get all foods with filters
 const getAllFoods = async (req, res) => {
@@ -56,7 +58,7 @@ const getFeaturedFoods = async (req, res) => {
 const getFoodById = async (req, res) => {
   try {
     const { id } = req.params;
-    const food = await Food.findById(id).populate('category').populate('reviews');
+    const food = await Food.findById(id).populate('category');
 
     if (!food) {
       return res.status(404).json({ message: 'Food not found' });
@@ -71,20 +73,49 @@ const getFoodById = async (req, res) => {
 // Create food (admin)
 const createFood = async (req, res) => {
   try {
-    const { name, description, price, category, image, isVegetarian, isFeatured, ingredients } = req.body;
+    const { name, description, price, category, foodType, isFeatured, ingredients, addOns, sizes } = req.body;
+
+    if (!name || !price || !category) {
+      return res.status(400).json({ message: 'Name, price, and category are required' });
+    }
+
+    const imageUrl = req.file ? req.file.path : null;
+    
+    let parsedAddOns = [];
+    if (addOns) {
+      try {
+        parsedAddOns = JSON.parse(addOns);
+      } catch (err) {
+        parsedAddOns = [];
+      }
+    }
+
+    let parsedSizes = [];
+    if (sizes) {
+      try {
+        parsedSizes = JSON.parse(sizes);
+      } catch (err) {
+        parsedSizes = [];
+      }
+    }
 
     const food = new Food({
       name,
       description,
-      price,
+      price: parseFloat(price),
       category,
-      image,
-      isVegetarian,
-      isFeatured,
-      ingredients,
+      image: imageUrl,
+      foodType: foodType || 'veg',
+      isVegetarian: foodType && ['veg', 'vegan', 'jain', 'egg-free', 'gluten-free', 'sugar-free'].includes(foodType),
+      isFeatured: isFeatured === 'true',
+      ingredients: ingredients ? ingredients.split(',').map((ing) => ing.trim()) : [],
+      addOns: parsedAddOns,
+      sizes: parsedSizes,
     });
 
     await food.save();
+    await food.populate('category');
+    broadcastFoodsUpdate('created', food);
     res.status(201).json({ success: true, food });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -95,12 +126,53 @@ const createFood = async (req, res) => {
 const updateFood = async (req, res) => {
   try {
     const { id } = req.params;
-    const food = await Food.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+    const { name, description, price, category, foodType, isFeatured, ingredients, addOns, sizes } = req.body;
+
+    const updateData = {};
+
+    if (name) updateData.name = name;
+    if (description) updateData.description = description;
+    if (price) updateData.price = parseFloat(price);
+    if (category) updateData.category = category;
+    if (foodType) {
+      updateData.foodType = foodType;
+      updateData.isVegetarian = ['veg', 'vegan', 'jain', 'egg-free', 'gluten-free', 'sugar-free'].includes(foodType);
+    }
+    if (isFeatured !== undefined) updateData.isFeatured = isFeatured === 'true';
+    if (ingredients) updateData.ingredients = ingredients.split(',').map((ing) => ing.trim());
+    
+    if (addOns) {
+      try {
+        updateData.addOns = JSON.parse(addOns);
+      } catch (err) {
+        // Keep existing addOns if parse fails
+      }
+    }
+
+    if (sizes) {
+      try {
+        updateData.sizes = JSON.parse(sizes);
+      } catch (err) {
+        // Keep existing sizes if parse fails
+      }
+    }
+
+    // If new image is uploaded, delete the old one
+    if (req.file) {
+      const existingFood = await Food.findById(id);
+      if (existingFood && existingFood.image) {
+        await deleteImageFromCloudinary(existingFood.image);
+      }
+      updateData.image = req.file.path;
+    }
+
+    const food = await Food.findByIdAndUpdate(id, updateData, { new: true, runValidators: true }).populate('category');
 
     if (!food) {
       return res.status(404).json({ message: 'Food not found' });
     }
 
+    broadcastFoodsUpdate('updated', food);
     res.json({ success: true, food });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -111,12 +183,21 @@ const updateFood = async (req, res) => {
 const deleteFood = async (req, res) => {
   try {
     const { id } = req.params;
-    const food = await Food.findByIdAndDelete(id);
+    const food = await Food.findById(id);
 
     if (!food) {
       return res.status(404).json({ message: 'Food not found' });
     }
 
+    // Delete the image from Cloudinary if it exists
+    if (food.image) {
+      await deleteImageFromCloudinary(food.image);
+    }
+
+    // Delete the food from database
+    await Food.findByIdAndDelete(id);
+
+    broadcastFoodsUpdate('deleted', { _id: id });
     res.json({ success: true, message: 'Food deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

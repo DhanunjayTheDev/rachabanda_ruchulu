@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const User = require('../models/User');
 const { generateOrderId } = require('../utils/helpers');
+const { broadcastOrdersUpdate } = require('../utils/realtime');
 
 // Create order
 const createOrder = async (req, res) => {
@@ -41,6 +42,7 @@ const createOrder = async (req, res) => {
 
     await Cart.findByIdAndUpdate(cart._id, { items: [] });
 
+    broadcastOrdersUpdate('created', order);
     res.status(201).json({ success: true, order });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -87,6 +89,7 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    broadcastOrdersUpdate('updated', order);
     res.json({ success: true, message: 'Order status updated', order });
   } catch (error) {
     res.status(500).json({ message: error.message });

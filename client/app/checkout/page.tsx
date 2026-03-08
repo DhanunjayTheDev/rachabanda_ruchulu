@@ -8,6 +8,7 @@ import useStore from '@/store/useStore';
 import { orderAPI, userAPI, settingsAPI, couponAPI, paymentAPI } from '@/lib/api';
 import LoginDialog from '@/components/modals/LoginDialog';
 import { useToast } from '@/lib/ToastContext';
+import { useRealtimeSettings } from '@/hooks/useRealtime';
 
 const LocationMapPicker = dynamic(() => import('@/components/maps/LocationMapPicker'), { ssr: false });
 
@@ -57,6 +58,12 @@ export default function CheckoutPage() {
   useEffect(() => {
     settingsAPI.get().then((res) => setSettings(res.data?.settings)).catch(() => {});
   }, []);
+
+  // Listen for settings updates from admin in real-time
+  useRealtimeSettings((updatedSettings) => {
+    setSettings(updatedSettings);
+    addToast('Settings updated! Prices may have changed.', 'info', 2000);
+  });
 
   // Load Razorpay script
   useEffect(() => {
@@ -163,7 +170,13 @@ export default function CheckoutPage() {
         : `${newAddress.addressLine1}${newAddress.addressLine2 ? ', ' + newAddress.addressLine2 : ''}, ${newAddress.city}, ${newAddress.state} - ${newAddress.zipCode}`;
 
       const orderData = {
-        items: items.map((i) => ({ food: i.foodId, quantity: i.quantity, price: i.price })),
+        items: items.map((i) => ({ 
+          food: i.foodId, 
+          quantity: i.quantity, 
+          price: i.price,
+          selectedSize: i.selectedSize,
+          selectedAddOns: i.selectedAddOns 
+        })),
         deliveryType,
         paymentMethod,
         deliveryAddress: deliveryAddressStr,

@@ -1,4 +1,5 @@
 const Announcement = require('../models/Announcement');
+const { broadcastAnnouncementsUpdate } = require('../utils/realtime');
 
 // Get Active Announcements (Public)
 const getActiveAnnouncements = async (req, res) => {
@@ -87,6 +88,7 @@ const createAnnouncement = async (req, res) => {
     });
 
     await announcement.save();
+    broadcastAnnouncementsUpdate('created', announcement);
     res.status(201).json({ success: true, announcement });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -147,6 +149,8 @@ const deleteAnnouncement = async (req, res) => {
     if (!announcement) {
       return res.status(404).json({ message: 'Announcement not found' });
     }
+
+    broadcastAnnouncementsUpdate('deleted', { _id: req.params.id });
 
     res.json({ success: true, message: 'Announcement deleted' });
   } catch (error) {

@@ -9,31 +9,74 @@ const router = express.Router();
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { deliveryType, deliveryAddressId, paymentMethod, couponCode } = req.body;
+    const { items: requestItems, deliveryType, deliveryAddressId, paymentMethod, couponCode, subtotal: requestSubtotal, tax: requestTax, deliveryFee: requestDeliveryFee, total: requestTotal } = req.body;
 
-    const cart = await Cart.findOne({ user: req.userId }).populate('items.food');
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ message: 'Cart is empty' });
-    }
+    // Use items from request body if provided, otherwise fetch from cart
+    let orderItems;
+    let tax, deliveryFee, subtotal;
 
-    const tax = Math.round(cart.subtotal * 0.05);
-    const deliveryFee = deliveryType === 'delivery' ? 30 : 0;
-    const total = cart.subtotal + tax + deliveryFee;
-
-    const order = new Order({
-      orderId: generateOrderId(),
-      user: req.userId,
-      items: cart.items.map((item) => ({
+    if (requestItems && requestItems.length > 0) {
+      // Items provided in request body (contains selectedSize/selectedAddOns)
+      orderItems = requestItems;
+      subtotal = requestSubtotal || 0;
+      tax = requestTax || 0;
+      deliveryFee = requestDeliveryFee || 0;
+    } else {
+      // Fetch from cart (legacy path)
+      const cart = await Cart.findOne({ user: req.userId }).populate('items.food');
+      if (!cart || cart.items.length === 0) {
+        return res.status(400).json({ message: 'Cart is empty' });
+      }
+      orderItems = cart.items.map((item) => ({
         food: item.food._id,
         quantity: item.quantity,
         price: item.price,
         totalPrice: item.totalPrice,
+        selectedSize: item.selectedSize,
+        selectedAddOns: item.selectedAddOns,
+        specialInstructions: item.specialInstructions,
+      }));
+      subtotal = cart.subtotal;
+      tax = Math.round(cart.subtotal * 0.05);
+      deliveryFee = deliveryType === 'delivery' ? 30 : 0;
+    }
+
+    // Calculate discount from coupon if provided
+    let discount = 0;
+    if (couponCode) {
+      try {
+        const Coupon = require('../models/Coupon');
+        const coupon = await Coupon.findOne({ code: couponCode, isActive: true });
+        if (coupon) {
+          discount = coupon.discountType === 'percentage'
+            ? Math.round((subtotal * coupon.discountValue) / 100)
+            : coupon.discountValue;
+        }
+      } catch (err) {
+        discount = 0;
+      }
+    }
+
+    const total = requestTotal || Math.max(0, subtotal + tax + deliveryFee - discount);
+
+    const order = new Order({
+      orderId: generateOrderId(),
+      user: req.userId,
+      items: orderItems.map((item) => ({
+        food: item.food?._id || item.food,
+        quantity: item.quantity,
+        price: item.price,
+        totalPrice: item.totalPrice || (item.price * item.quantity),
+        selectedSize: item.selectedSize,
+        selectedAddOns: item.selectedAddOns,
+        specialInstructions: item.specialInstructions,
       })),
       deliveryType,
       deliveryAddress: deliveryAddressId,
-      subtotal: cart.subtotal,
+      subtotal,
       tax,
       deliveryFee,
+      discount,
       total,
       paymentMethod,
       couponCode,
@@ -47,11 +90,17 @@ router.post('/', auth, async (req, res) => {
 
     await order.save();
 
-    await Cart.findOneAndDelete({ user: req.userId });
+    // Delete cart only if no items were provided in request (i.e., we used cart DB)
+    if (!requestItems || requestItems.length === 0) {
+      await Cart.findOneAndDelete({ user: req.userId });
+    }
 
     await User.findByIdAndUpdate(req.userId, {
       $inc: { totalOrders: 1 },
     });
+
+    // Populate food details before returning
+    await order.populate('items.food');
 
     res.status(201).json({
       success: true,
@@ -99,7 +148,7 @@ router.put('/:id/status', adminAuth, async (req, res) => {
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       {
-        ordersStatus: status,
+        status: status,
       },
       { new: true }
     );

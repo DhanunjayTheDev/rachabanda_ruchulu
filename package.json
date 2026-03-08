@@ -11,11 +11,6 @@
     "docker:up": "docker-compose up",
     "docker:down": "docker-compose down"
   },
-  "workspaces": [
-    "client",
-    "admin",
-    "server"
-  ],
   "keywords": [
     "food-ordering",
     "restaurant",

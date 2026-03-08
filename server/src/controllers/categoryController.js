@@ -1,4 +1,5 @@
 const Category = require('../models/Category');
+const { broadcastCategoriesUpdate } = require('../utils/realtime');
 
 // Get all categories
 const getAllCategories = async (req, res) => {
@@ -38,6 +39,7 @@ const createCategory = async (req, res) => {
     });
 
     await category.save();
+    broadcastCategoriesUpdate('created', category);
     res.status(201).json({ success: true, category });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -54,6 +56,7 @@ const updateCategory = async (req, res) => {
       return res.status(404).json({ message: 'Category not found' });
     }
 
+    broadcastCategoriesUpdate('updated', category);
     res.json({ success: true, category });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -70,6 +73,7 @@ const deleteCategory = async (req, res) => {
       return res.status(404).json({ message: 'Category not found' });
     }
 
+    broadcastCategoriesUpdate('deleted', { _id: id });
     res.json({ success: true, message: 'Category deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

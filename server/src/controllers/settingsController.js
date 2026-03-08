@@ -1,4 +1,5 @@
 const Settings = require('../models/Settings');
+const { broadcastSettingsUpdate } = require('../utils/realtime');
 
 // Get Settings
 const getSettings = async (req, res) => {
@@ -70,6 +71,7 @@ const updateSettings = async (req, res) => {
       runValidators: true,
     });
 
+    broadcastSettingsUpdate(settings);
     res.json({ success: true, settings });
   } catch (error) {
     res.status(500).json({ message: error.message });

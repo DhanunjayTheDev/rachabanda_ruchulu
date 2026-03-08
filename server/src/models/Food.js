@@ -48,6 +48,11 @@ const foodSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    foodType: {
+      type: String,
+      enum: ['veg', 'vegan', 'jain', 'non-veg', 'egg-free', 'gluten-free', 'sugar-free'],
+      default: 'veg',
+    },
     ingredients: [String],
     preparationTime: {
       type: Number,
@@ -87,14 +92,16 @@ const foodSchema = new mongoose.Schema(
     },
     sizes: [
       {
+        _id: mongoose.Schema.Types.ObjectId,
         name: String,
         label: String,
-        actualPrice: Number,
-        offerPrice: Number,
+        price: Number,
+        servings: Number,
       },
     ],
     addOns: [
       {
+        _id: mongoose.Schema.Types.ObjectId,
         name: String,
         price: Number,
       },

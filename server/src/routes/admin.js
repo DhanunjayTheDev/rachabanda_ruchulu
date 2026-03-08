@@ -68,7 +68,11 @@ router.post('/login', async (req, res) => {
 
 router.get('/orders', adminAuth, async (req, res) => {
   try {
-    const orders = await Order.find().populate('user').populate('items.food').sort({ createdAt: -1 });
+    const orders = await Order.find()
+      .populate('user', 'name email phone')
+      .populate('items.food')
+      .populate('deliveryAddress')
+      .sort({ createdAt: -1 });
 
     res.json({ success: true, orders });
   } catch (error) {
@@ -87,26 +91,37 @@ router.get('/foods', adminAuth, async (req, res) => {
   }
 });
 
+router.get('/orders/:id', adminAuth, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name email phone')
+      .populate('items.food')
+      .populate('deliveryAddress');
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.put('/orders/:id/status', adminAuth, async (req, res) => {
   try {
     const { status, notes } = req.body;
+    const { broadcastOrdersUpdate } = require('../utils/realtime');
 
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      {
-        ordersStatus: status,
-      },
-      { new: true }
-    );
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name email phone')
+      .populate('items.food')
+      .populate('deliveryAddress');
 
-    order.statusTimeline.push({
-      status,
-      timestamp: new Date(),
-      notes,
-    });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
 
+    order.status = status;
+    order.statusTimeline.push({ status, timestamp: new Date(), notes });
+    if (status === 'delivered') order.actualDeliveryTime = new Date();
     await order.save();
 
+    broadcastOrdersUpdate('updated', order);
     res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -115,13 +130,31 @@ router.put('/orders/:id/status', adminAuth, async (req, res) => {
 
 router.post('/foods', adminAuth, upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, category, isVegetarian, isFeatured, ingredients } = req.body;
+    const { name, description, price, category, foodType, isFeatured, ingredients, addOns, sizes } = req.body;
 
     if (!name || !price || !category) {
       return res.status(400).json({ message: 'Name, price, and category are required' });
     }
 
     const imageUrl = req.file ? req.file.path : null;
+    
+    let parsedAddOns = [];
+    if (addOns) {
+      try {
+        parsedAddOns = JSON.parse(addOns);
+      } catch (err) {
+        parsedAddOns = [];
+      }
+    }
+
+    let parsedSizes = [];
+    if (sizes) {
+      try {
+        parsedSizes = JSON.parse(sizes);
+      } catch (err) {
+        parsedSizes = [];
+      }
+    }
 
     const food = new Food({
       name,
@@ -129,12 +162,16 @@ router.post('/foods', adminAuth, upload.single('image'), async (req, res) => {
       price: parseFloat(price),
       category,
       image: imageUrl,
-      isVegetarian: isVegetarian === 'true',
+      foodType: foodType || 'veg',
+      isVegetarian: foodType && ['veg', 'vegan', 'jain', 'egg-free', 'gluten-free', 'sugar-free'].includes(foodType),
       isFeatured: isFeatured === 'true',
       ingredients: ingredients ? JSON.parse(ingredients) : [],
+      addOns: parsedAddOns,
+      sizes: parsedSizes,
     });
 
     await food.save();
+    await food.populate('category');
 
     res.status(201).json({ success: true, food });
   } catch (error) {
@@ -144,17 +181,37 @@ router.post('/foods', adminAuth, upload.single('image'), async (req, res) => {
 
 router.put('/foods/:id', adminAuth, upload.single('image'), async (req, res) => {
   try {
-    const { name, description, price, category, isVegetarian, isFeatured, ingredients } = req.body;
+    const { name, description, price, category, foodType, isFeatured, ingredients, addOns, sizes } = req.body;
 
     const updateData = {
       name,
       description,
       price: price ? parseFloat(price) : undefined,
       category,
-      isVegetarian: isVegetarian !== undefined ? isVegetarian === 'true' : undefined,
       isFeatured: isFeatured !== undefined ? isFeatured === 'true' : undefined,
       ingredients: ingredients ? JSON.parse(ingredients) : undefined,
     };
+    
+    if (foodType) {
+      updateData.foodType = foodType;
+      updateData.isVegetarian = ['veg', 'vegan', 'jain', 'egg-free', 'gluten-free', 'sugar-free'].includes(foodType);
+    }
+    
+    if (addOns) {
+      try {
+        updateData.addOns = JSON.parse(addOns);
+      } catch (err) {
+        // Keep existing addOns if parse fails
+      }
+    }
+
+    if (sizes) {
+      try {
+        updateData.sizes = JSON.parse(sizes);
+      } catch (err) {
+        // Keep existing sizes if parse fails
+      }
+    }
 
     // Remove undefined values
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
@@ -164,7 +221,7 @@ router.put('/foods/:id', adminAuth, upload.single('image'), async (req, res) => 
       updateData.image = req.file.path;
     }
 
-    const food = await Food.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    const food = await Food.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true }).populate('category');
 
     if (!food) {
       return res.status(404).json({ message: 'Food not found' });
@@ -276,7 +333,7 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
     });
     const totalCustomers = await require('../models/User').countDocuments();
     const revenue = await require('../models/Order').aggregate([
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      { $group: { _id: null, total: { $sum: '$total' } } },
     ]);
 
     const categoryData = await require('../models/Food').aggregate([
@@ -334,7 +391,7 @@ router.get('/dashboard/revenue', adminAuth, async (req, res) => {
       {
         $group: {
           _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
-          sales: { $sum: '$totalAmount' },
+          sales: { $sum: '$total' },
           orders: { $sum: 1 },
         },
       },
@@ -480,6 +537,18 @@ router.put('/customers/:id/unblock', adminAuth, async (req, res) => {
     ).select('-password');
     if (!customer) return res.status(404).json({ message: 'Customer not found' });
     res.json({ success: true, customer });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete Customer
+router.delete('/customers/:id', adminAuth, async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const customer = await User.findByIdAndDelete(req.params.id);
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    res.json({ success: true, message: 'Customer deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

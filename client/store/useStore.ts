@@ -41,6 +41,7 @@ interface CartStore {
   clearCart: () => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
+  getWishlistCount: () => number;
   addToWishlist: (item: WishlistItem) => void;
   removeFromWishlist: (foodId: string) => void;
   isInWishlist: (foodId: string) => boolean;
@@ -65,38 +66,67 @@ const useStore = create<CartStore>()(
       isLoadingWishlist: false,
 
       addToCart: (item) => {
+        const normalizeAddOns = (addOns?: string[]) =>
+          addOns && addOns.length > 0 ? JSON.stringify([...addOns].sort()) : '[]';
+
         set((state) => {
-          const existingItem = state.items.find((i) => i.foodId === item.foodId);
+          const existingItem = state.items.find(
+            (i) =>
+              i.foodId === item.foodId &&
+              (i.selectedSize || '') === (item.selectedSize || '') &&
+              normalizeAddOns(i.selectedAddOns) === normalizeAddOns(item.selectedAddOns)
+          );
           if (existingItem) {
             return {
               items: state.items.map((i) =>
-                i.foodId === item.foodId ? { ...i, quantity: i.quantity + item.quantity } : i
+                i === existingItem ? { ...i, quantity: i.quantity + item.quantity } : i
               ),
             };
           }
           return { items: [...state.items, item] };
         });
-        // Call server API to add item to cart
-        try {
-          cartAPI.add({
-            foodId: item.foodId,
-            quantity: item.quantity,
-            selectedSize: item.selectedSize,
-            selectedAddOns: item.selectedAddOns,
-          });
-        } catch (error) {
+        // Sync to server and capture the server-assigned _id
+        cartAPI.add({
+          foodId: item.foodId,
+          quantity: item.quantity,
+          selectedSize: item.selectedSize,
+          selectedAddOns: item.selectedAddOns,
+        }).then((res) => {
+          if (res.data?.cart?.items) {
+            // Find the matching server item by food + size + addons
+            const serverItem = res.data.cart.items.find(
+              (i: any) =>
+                (i.food?.toString() === item.foodId || i.food === item.foodId) &&
+                (i.selectedSize || '') === (item.selectedSize || '') &&
+                normalizeAddOns(i.selectedAddOns) === normalizeAddOns(item.selectedAddOns)
+            );
+            if (serverItem?._id) {
+              set((state) => ({
+                items: state.items.map((i) =>
+                  i.foodId === item.foodId &&
+                  (i.selectedSize || '') === (item.selectedSize || '') &&
+                  normalizeAddOns(i.selectedAddOns) === normalizeAddOns(item.selectedAddOns)
+                    ? { ...i, _id: serverItem._id }
+                    : i
+                ),
+              }));
+            }
+          }
+        }).catch((error) => {
           console.error('Failed to add to cart on server:', error);
-        }
+        });
       },
 
-      removeFromCart: async (foodId) => {
-        const itemToRemove = get().items.find((i) => i.foodId === foodId);
-        const itemId = itemToRemove?._id;
+      removeFromCart: async (itemId) => {
+        // itemId can be _id (from cart page) or foodId (fallback)
+        const itemToRemove = get().items.find((i) => i._id === itemId || i.foodId === itemId);
+        if (!itemToRemove) return;
+        const serverItemId = itemToRemove._id;
         
         // Call server API to remove item from cart first
-        if (itemId) {
+        if (serverItemId) {
           try {
-            await cartAPI.remove(itemId);
+            await cartAPI.remove(serverItemId);
           } catch (error) {
             console.error('Failed to remove from cart on server:', error);
             return; // Don't update local state if server deletion failed
@@ -105,25 +135,26 @@ const useStore = create<CartStore>()(
 
         // Only update local state after successful server deletion
         set((state) => ({
-          items: state.items.filter((item) => item.foodId !== foodId),
+          items: state.items.filter((item) =>
+            serverItemId ? item._id !== serverItemId : item.foodId !== itemId
+          ),
         }));
       },
 
-      updateQuantity: (foodId, quantity) => {
+      updateQuantity: (itemId, quantity) => {
+        // itemId can be _id (from cart page) or foodId (fallback)
         set((state) => ({
           items: state.items.map((item) =>
-            item.foodId === foodId ? { ...item, quantity } : item
+            (item._id === itemId || item.foodId === itemId) ? { ...item, quantity } : item
           ),
         }));
         // Call server API to update cart item
         if (quantity > 0) {
-          try {
-            const item = get().items.find((i) => i.foodId === foodId);
-            if (item?._id) {
-              cartAPI.update(item._id, { quantity });
-            }
-          } catch (error) {
-            console.error('Failed to update cart on server:', error);
+          const item = get().items.find((i) => i._id === itemId || i.foodId === itemId);
+          if (item?._id) {
+            cartAPI.update(item._id, { quantity }).catch((error) => {
+              console.error('Failed to update cart on server:', error);
+            });
           }
         }
       },
@@ -131,11 +162,9 @@ const useStore = create<CartStore>()(
       clearCart: () => {
         set({ items: [] });
         // Call server API to clear cart
-        try {
-          cartAPI.clear();
-        } catch (error) {
+        cartAPI.clear().catch((error) => {
           console.error('Failed to clear cart on server:', error);
-        }
+        });
       },
 
       getTotalPrice: () => {
@@ -146,6 +175,10 @@ const useStore = create<CartStore>()(
         return get().items.reduce((total, item) => total + item.quantity, 0);
       },
 
+      getWishlistCount: () => {
+        return get().wishlistItems.length;
+      },
+
       addToWishlist: (item) => {
         set((state) => {
           const exists = state.wishlistItems.find((i) => i.foodId === item.foodId);
@@ -153,11 +186,9 @@ const useStore = create<CartStore>()(
           return { wishlistItems: [...state.wishlistItems, item] };
         });
         // Call server API
-        try {
-          wishlistAPI.add({ foodId: item.foodId });
-        } catch (error) {
+        wishlistAPI.add({ foodId: item.foodId }).catch((error) => {
           console.error('Failed to add to wishlist on server:', error);
-        }
+        });
       },
 
       removeFromWishlist: async (foodId) => {
@@ -281,6 +312,8 @@ const useStore = create<CartStore>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        items: state.items,
+        wishlistItems: state.wishlistItems,
       }),
     }
   )

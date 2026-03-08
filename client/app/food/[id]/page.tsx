@@ -14,12 +14,13 @@ interface FoodData {
   image: string;
   rating: number;
   reviewCount: number;
-  isVegetarian: boolean;
+  isVegetarian?: boolean;
+  foodType?: string;
   description: string;
   ingredients: string[];
   category: { _id: string; name: string } | string;
-  sizes?: { id: string; name: string; price: number; servings: number }[];
-  addOns?: { id: string; name: string; price: number }[];
+  sizes?: { _id: string; name: string; price: number; servings: number }[];
+  addOns?: { _id: string; name: string; price: number }[];
   reviews?: { _id: string; user: { name: string }; rating: number; comment: string }[];
 }
 
@@ -41,7 +42,7 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
         const res = await foodAPI.getById(params.id);
         const data = res.data.food || res.data;
         setFood(data);
-        if (data.sizes?.length) setSelectedSize(data.sizes[0].id);
+        if (data.sizes?.length) setSelectedSize(data.sizes[0]._id);
       } catch {
         // handle error
       } finally {
@@ -83,9 +84,9 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
   const sizes = food.sizes || [];
   const addOns = food.addOns || [];
   const reviews = food.reviews || [];
-  const selectedSizeData = sizes.find((s) => s.id === selectedSize);
+  const selectedSizeData = sizes.find((s) => s._id === selectedSize);
   const basePrice = selectedSizeData?.price || food.price;
-  const addOnsTotal = addOns.filter((a) => selectedAddOns.includes(a.id)).reduce((s, a) => s + a.price, 0);
+  const addOnsTotal = addOns.filter((a) => selectedAddOns.includes(a._id)).reduce((s, a) => s + a.price, 0);
 
   const handleAddToCart = () => {
     if (!isLoggedIn) {
@@ -112,6 +113,21 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
     setSelectedAddOns((prev) => prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]);
   };
 
+  const getFoodTypeDisplay = () => {
+    const typeMap: Record<string, any> = {
+      'veg': { emoji: '🥬', label: 'Veg', color: 'bg-green-500/20 text-green-400' },
+      'vegan': { emoji: '🌱', label: 'Vegan', color: 'bg-green-600/20 text-green-300' },
+      'jain': { emoji: '☸️', label: 'Jain', color: 'bg-green-500/20 text-green-400' },
+      'non-veg': { emoji: '🍗', label: 'Non-Veg', color: 'bg-red-500/20 text-red-400' },
+      'egg-free': { emoji: '🚫', label: 'Egg-Free', color: 'bg-blue-500/20 text-blue-400' },
+      'gluten-free': { emoji: '🌾', label: 'Gluten-Free', color: 'bg-yellow-600/20 text-yellow-300' },
+      'sugar-free': { emoji: '🍯', label: 'Sugar-Free', color: 'bg-orange-600/20 text-orange-300' },
+    };
+    
+    const type = food?.foodType || (food?.isVegetarian ? 'veg' : 'non-veg');
+    return typeMap[type] || { emoji: '🍽️', label: 'Food', color: 'bg-gray-500/20 text-gray-400' };
+  };
+
   return (
     <main className="min-h-screen pt-28 pb-20 px-6">
         <div className="max-w-7xl mx-auto">
@@ -126,7 +142,7 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
             {/* Image */}
             <div className="card flex items-center justify-center overflow-hidden">
               {food.image && food.image.startsWith('http') ? (
-                <img src={food.image} alt={food.name} className="w-full h-80 object-cover rounded-xl" loading="lazy" />
+                <img src={food.image} alt={food.name} className="w-full h-96 object-cover rounded-xl" loading="lazy" />
               ) : (
                 <div className="text-9xl">{food.image || '🍽️'}</div>
               )}
@@ -139,11 +155,14 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
                 <div className="flex items-center gap-4 mb-4">
                   <span className="text-primary-gold">⭐ {food.rating?.toFixed(1) || 'N/A'}</span>
                   {food.reviewCount > 0 && <span className="text-gray-400">({food.reviewCount} reviews)</span>}
-                  {food.isVegetarian ? (
-                    <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-xs font-semibold">🌱 Veg</span>
-                  ) : (
-                    <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-semibold">🍖 Non-Veg</span>
-                  )}
+                  {(() => {
+                    const typeInfo = getFoodTypeDisplay();
+                    return (
+                      <span className={`${typeInfo.color} px-2 py-0.5 rounded text-xs font-semibold`}>
+                        {typeInfo.emoji} {typeInfo.label}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-gray-400">{food.description}</p>
               </div>
@@ -155,10 +174,10 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
                   <div className="grid grid-cols-3 gap-3">
                     {sizes.map((size) => (
                       <button
-                        key={size.id}
-                        onClick={() => setSelectedSize(size.id)}
+                        key={size._id}
+                        onClick={() => setSelectedSize(size._id)}
                         className={`p-3 rounded-lg border transition-all ${
-                          selectedSize === size.id
+                          selectedSize === size._id
                             ? 'border-primary-gold bg-primary-gold/10'
                             : 'border-gray-600 hover:border-primary-gold'
                         }`}
@@ -178,13 +197,13 @@ export default function FoodDetailsPage({ params }: { params: { id: string } }) 
                   <div className="space-y-2">
                     {addOns.map((addon) => (
                       <label
-                        key={addon.id}
+                        key={addon._id}
                         className="flex items-center gap-3 p-3 border border-gray-600 rounded-lg hover:border-primary-gold cursor-pointer transition-all"
                       >
                         <input
                           type="checkbox"
-                          checked={selectedAddOns.includes(addon.id)}
-                          onChange={() => toggleAddOn(addon.id)}
+                          checked={selectedAddOns.includes(addon._id)}
+                          onChange={() => toggleAddOn(addon._id)}
                           className="w-4 h-4 accent-primary-gold"
                         />
                         <span className="flex-1">{addon.name}</span>

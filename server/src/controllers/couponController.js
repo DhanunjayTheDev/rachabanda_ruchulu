@@ -1,5 +1,6 @@
 const Coupon = require('../models/Coupon');
 const User = require('../models/User');
+const { broadcastCouponsUpdate } = require('../utils/realtime');
 
 // Get available coupons for user (with first-time special coupon)
 const getAvailableCoupons = async (req, res) => {
@@ -121,6 +122,7 @@ const createCoupon = async (req, res) => {
     });
 
     await coupon.save();
+    broadcastCouponsUpdate('created', coupon);
     res.status(201).json({ success: true, coupon });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -175,6 +177,7 @@ const updateCoupon = async (req, res) => {
       return res.status(404).json({ message: 'Coupon not found' });
     }
 
+    broadcastCouponsUpdate('updated', coupon);
     res.json({ success: true, coupon });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -189,6 +192,7 @@ const deleteCoupon = async (req, res) => {
       return res.status(404).json({ message: 'Coupon not found' });
     }
 
+    broadcastCouponsUpdate('deleted', { _id: req.params.id });
     res.json({ success: true, message: 'Coupon deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });

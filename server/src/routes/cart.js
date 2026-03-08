@@ -19,15 +19,20 @@ router.post('/add', auth, async (req, res) => {
       cart = new Cart({ user: req.userId, items: [] });
     }
 
+    // Normalize selectedAddOns: treat undefined, null, and [] as equivalent
+    const normalizeAddOns = (addOns) =>
+      Array.isArray(addOns) && addOns.length > 0 ? JSON.stringify([...addOns].sort()) : '[]';
+
     const existingItem = cart.items.find(
       (item) =>
         item.food.toString() === foodId &&
-        item.selectedSize === selectedSize &&
-        JSON.stringify(item.selectedAddOns) === JSON.stringify(selectedAddOns)
+        (item.selectedSize || '') === (selectedSize || '') &&
+        normalizeAddOns(item.selectedAddOns) === normalizeAddOns(selectedAddOns)
     );
 
     if (existingItem) {
       existingItem.quantity += quantity;
+      existingItem.totalPrice = existingItem.price * existingItem.quantity;
     } else {
       cart.items.push({
         food: foodId,

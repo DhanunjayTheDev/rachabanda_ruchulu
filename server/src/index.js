@@ -2,11 +2,22 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const http = require('http');
+const socketIo = require('socket.io');
 const connectDB = require('./config/database');
 const createDefaultAdmin = require('./utils/createDefaultAdmin');
+const initializeCategories = require('./utils/initializeCategories');
 const errorHandler = require('./middleware/errorHandler');
+const { initializeRealtime } = require('./utils/realtime');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: [process.env.CLIENT_URL || 'http://localhost:3000', process.env.ADMIN_URL || 'http://localhost:3001'],
+    methods: ['GET', 'POST'],
+  },
+});
 
 const startServer = async () => {
   // Connect to database
@@ -14,6 +25,9 @@ const startServer = async () => {
 
   // Create default admin
   await createDefaultAdmin();
+
+  // Initialize categories
+  await initializeCategories();
 
   // Middleware
   app.use(helmet());
@@ -52,8 +66,21 @@ const startServer = async () => {
 
   app.use(errorHandler);
 
+  // Initialize real-time service
+  console.log('🔌 Initializing real-time service with socket.io');
+  initializeRealtime(io);
+
+  // Socket.io connection handling
+  io.on('connection', (socket) => {
+    console.log(`✅ Real-time client connected: ${socket.id}`);
+    socket.emit('connected', { message: 'Connected to real-time service' });
+    socket.on('disconnect', () => {
+      console.log(`❌ Real-time client disconnected: ${socket.id}`);
+    });
+  });
+
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 };

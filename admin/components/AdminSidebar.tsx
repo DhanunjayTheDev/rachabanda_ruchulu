@@ -144,7 +144,7 @@ export default function AdminSidebar() {
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <p className="text-sm font-medium text-white truncate">{adminName}</p>
+                <p className="text-sm font-medium text-white line-clamp-2">{adminName}</p>
                 <p className="text-xs text-gray-500 truncate">{adminEmail}</p>
               </div>
             )}

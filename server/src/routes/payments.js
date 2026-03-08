@@ -4,6 +4,7 @@ const Razorpay = require('razorpay');
 const { auth } = require('../middleware/auth');
 const Payment = require('../models/Payment');
 const Order = require('../models/Order');
+const { broadcastOrdersUpdate } = require('../utils/realtime');
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ router.post('/verify', auth, async (req, res) => {
 
     const order = await Order.findById(payment.order);
     order.paymentStatus = 'completed';
-    order.ordersStatus = 'confirmed';
+    order.status = 'confirmed';
     order.paymentId = razorpayPaymentId;
     order.statusTimeline.push({
       status: 'confirmed',
@@ -85,6 +86,9 @@ router.post('/verify', auth, async (req, res) => {
     });
 
     await order.save();
+
+    // Broadcast the order update to notify the user
+    broadcastOrdersUpdate('updated', order);
 
     res.json({
       success: true,

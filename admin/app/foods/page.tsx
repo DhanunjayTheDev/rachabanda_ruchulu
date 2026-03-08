@@ -22,9 +22,11 @@ export default function AdminFoodsPage() {
     description: '',
     price: '',
     category: '',
-    isVegetarian: false,
+    foodType: 'veg',
     isFeatured: false,
     ingredients: '',
+    addOns: [] as Array<{ name: string; price: string }>,
+    sizes: [] as Array<{ name: string; label: string; price: string; servings: string }>,
   });
 
   useEffect(() => {
@@ -45,6 +47,22 @@ export default function AdminFoodsPage() {
   }, [addToast]);
 
   const getCatName = (cat: any) => (typeof cat === 'object' ? cat?.name : cat) || '';
+  const getCatIcon = (cat: any) => (typeof cat === 'object' ? cat?.icon : null) || '🍽️';
+
+  const getFoodTypeDisplay = (food: any) => {
+    const typeMap: Record<string, any> = {
+      'veg': { emoji: '🥬', label: 'Vegetarian', color: 'bg-green-500/20 text-green-400' },
+      'vegan': { emoji: '🌱', label: 'Vegan', color: 'bg-green-600/20 text-green-300' },
+      'jain': { emoji: '☸️', label: 'Jain (Pure Veg)', color: 'bg-green-500/20 text-green-400' },
+      'non-veg': { emoji: '🍗', label: 'Non-Vegetarian', color: 'bg-red-500/20 text-red-400' },
+      'egg-free': { emoji: '🚫', label: 'Egg-Free', color: 'bg-blue-500/20 text-blue-400' },
+      'gluten-free': { emoji: '🌾', label: 'Gluten-Free', color: 'bg-yellow-500/20 text-yellow-400' },
+      'sugar-free': { emoji: '🍯', label: 'Sugar-Free', color: 'bg-orange-500/20 text-orange-400' },
+    };
+    
+    const foodType = food.foodType || (food.isVegetarian ? 'veg' : 'non-veg');
+    return typeMap[foodType] || { emoji: '🍽️', label: 'Food', color: 'bg-gray-500/20 text-gray-400' };
+  };
 
   const filteredFoods = foods.filter(
     (food: any) =>
@@ -88,9 +106,26 @@ export default function AdminFoodsPage() {
       formDataObj.append('description', formData.description);
       formDataObj.append('price', formData.price);
       formDataObj.append('category', formData.category);
-      formDataObj.append('isVegetarian', String(formData.isVegetarian));
+      formDataObj.append('foodType', formData.foodType);
       formDataObj.append('isFeatured', String(formData.isFeatured));
       formDataObj.append('ingredients', formData.ingredients);
+      
+      // Add add-ons as JSON
+      const addOnsToSend = formData.addOns
+        .filter((addon) => addon.name && addon.price)
+        .map((addon) => ({ name: addon.name, price: parseFloat(addon.price) }));
+      formDataObj.append('addOns', JSON.stringify(addOnsToSend));
+
+      // Add sizes as JSON
+      const sizesToSend = formData.sizes
+        .filter((size) => size.name && size.price)
+        .map((size) => ({ 
+          name: size.name, 
+          label: size.label || size.name, 
+          price: parseFloat(size.price),
+          servings: size.servings ? parseInt(size.servings) : undefined
+        }));
+      formDataObj.append('sizes', JSON.stringify(sizesToSend));
 
       const imageInput = document.getElementById('foodImage') as HTMLInputElement;
       if (imageInput?.files?.[0]) {
@@ -98,8 +133,8 @@ export default function AdminFoodsPage() {
       }
 
       if (editingFood) {
-        await foodsAPI.update(editingFood._id || editingFood.id, formDataObj);
-        setFoods(foods.map((f) => (f._id === editingFood._id || f.id === editingFood.id ? { ...f, ...formData } : f)));
+        const res = await foodsAPI.update(editingFood._id || editingFood.id, formDataObj);
+        setFoods(foods.map((f) => (f._id === editingFood._id || f.id === editingFood.id ? res.data.food : f)));
         addToast('Food updated successfully!', 'success', 3000);
       } else {
         const res = await foodsAPI.create(formDataObj);
@@ -109,7 +144,7 @@ export default function AdminFoodsPage() {
 
       setShowForm(false);
       setEditingFood(null);
-      setFormData({ name: '', description: '', price: '', category: '', isVegetarian: false, isFeatured: false, ingredients: '' });
+      setFormData({ name: '', description: '', price: '', category: '', foodType: 'veg', isFeatured: false, ingredients: '', addOns: [], sizes: [] });
       setImagePreview('');
     } catch (error: any) {
       addToast(error.response?.data?.message || 'Failed to save food', 'error', 3000);
@@ -120,14 +155,30 @@ export default function AdminFoodsPage() {
 
   const handleEdit = (food: any) => {
     setEditingFood(food);
+    
+    // Handle ingredients - could be array or string
+    let ingredientsStr = '';
+    if (Array.isArray(food.ingredients)) {
+      ingredientsStr = food.ingredients.join(', ');
+    } else if (typeof food.ingredients === 'string') {
+      ingredientsStr = food.ingredients;
+    }
+    
     setFormData({
       name: food.name,
       description: food.description,
       price: food.price,
       category: food.category?._id || food.category,
-      isVegetarian: food.isVegetarian,
+      foodType: food.foodType || (food.isVegetarian ? 'veg' : 'non-veg'),
       isFeatured: food.isFeatured,
-      ingredients: food.ingredients?.join(', ') || '',
+      ingredients: ingredientsStr,
+      addOns: (food.addOns || []).map((addon: any) => ({ name: addon.name, price: addon.price.toString() })),
+      sizes: (food.sizes || []).map((size: any) => ({ 
+        name: size.name, 
+        label: size.label || size.name, 
+        price: size.price.toString(),
+        servings: size.servings?.toString() || ''
+      })),
     });
     setImagePreview(food.image || '');
     setShowForm(true);
@@ -142,7 +193,7 @@ export default function AdminFoodsPage() {
             <button
               onClick={() => {
                 setEditingFood(null);
-                setFormData({ name: '', description: '', price: '', category: '', isVegetarian: false, isFeatured: false, ingredients: '' });
+                setFormData({ name: '', description: '', price: '', category: '', foodType: 'veg', isFeatured: false, ingredients: '', addOns: [], sizes: [] });
                 setImagePreview('');
                 setShowForm(true);
               }}
@@ -173,7 +224,7 @@ export default function AdminFoodsPage() {
         </div>
 
         <div className="card mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div>
               <label className="block text-sm font-semibold mb-2">Search</label>
               <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search foods..." className="w-full px-4 py-2 rounded-lg bg-dark-input border border-primary-gold/30 text-white placeholder-gray-500 focus:outline-none focus:border-primary-gold" />
@@ -185,6 +236,39 @@ export default function AdminFoodsPage() {
                 onChange={setFilterCategory}
                 options={[{ value: 'All', label: 'All' }, ...categories.map((c: any) => ({ value: c.name, label: c.name }))]}
               />
+            </div>
+          </div>
+
+          {/* Quick Category Filter Bar */}
+          <div className="border-t border-gray-600 pt-4">
+            <p className="text-xs font-semibold text-gray-400 mb-3">QUICK FILTERS</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterCategory('All')}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                  filterCategory === 'All'
+                    ? 'bg-primary-gold/30 text-primary-gold border border-primary-gold'
+                    : 'bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-600/50'
+                }`}
+              >
+                All
+              </button>
+              {categories
+                .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                .map((cat: any) => (
+                  <button
+                    key={cat._id || cat.id}
+                    onClick={() => setFilterCategory(cat.name)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2 ${
+                      filterCategory === cat.name
+                        ? 'bg-primary-gold/30 text-primary-gold border border-primary-gold'
+                        : 'bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-600/50'
+                    }`}
+                  >
+                    <span>{cat.icon || '🍽️'}</span>
+                    {cat.name}
+                  </button>
+                ))}
             </div>
           </div>
         </div>
@@ -217,12 +301,22 @@ export default function AdminFoodsPage() {
                           <span className="font-semibold">{food.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">{getCatName(food.category)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{getCatIcon(food.category)}</span>
+                          <span className="font-medium">{getCatName(food.category)}</span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4"><span className="text-primary-gold font-bold">₹{food.price}</span></td>
                       <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${food.isVegetarian ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                          {food.isVegetarian ? '🥬 Veg' : '🍗 Non-Veg'}
-                        </span>
+                        {(() => {
+                          const typeInfo = getFoodTypeDisplay(food);
+                          return (
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${typeInfo.color}`}>
+                              {typeInfo.emoji} {typeInfo.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -286,18 +380,28 @@ export default function AdminFoodsPage() {
                     value={formData.category}
                     onChange={(v) => setFormData({ ...formData, category: v })}
                     placeholder="Select Category"
-                    options={categories.map((c: any) => ({ value: c._id || c.id, label: c.name }))}
+                    options={categories
+                      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                      .map((c: any) => ({ 
+                        value: c._id || c.id, 
+                        label: `${c.icon || '🍽️'} ${c.name}` 
+                      }))}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold mb-2">Type</label>
                   <AdminSelect
-                    value={formData.isVegetarian ? 'veg' : 'non-veg'}
-                    onChange={(v) => setFormData({ ...formData, isVegetarian: v === 'veg' })}
+                    value={formData.foodType}
+                    onChange={(v) => setFormData({ ...formData, foodType: v })}
                     options={[
                       { value: 'veg', label: '🥬 Vegetarian' },
+                      { value: 'vegan', label: '🌱 Vegan' },
+                      { value: 'jain', label: '☸️ Jain (Pure Veg)' },
                       { value: 'non-veg', label: '🍗 Non-Vegetarian' },
+                      { value: 'egg-free', label: '🚫 Egg-Free' },
+                      { value: 'gluten-free', label: '🌾 Gluten-Free' },
+                      { value: 'sugar-free', label: '🍯 Sugar-Free' },
                     ]}
                   />
                 </div>
@@ -339,6 +443,117 @@ export default function AdminFoodsPage() {
                     <img src={imagePreview} alt="Preview" className="w-32 h-32 object-cover rounded-lg" />
                   </div>
                 )}
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <label className="block text-sm font-semibold">Add-ons (Optional)</label>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, addOns: [...formData.addOns, { name: '', price: '' }] })}
+                    className="text-xs bg-primary-gold/20 text-primary-gold px-2 py-1 rounded hover:bg-primary-gold/30 font-semibold"
+                  >
+                    + Add
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {formData.addOns.map((addon, idx) => (
+                    <div key={idx} className="flex gap-2 items-end">
+                      <input
+                        type="text"
+                        placeholder="Addon name"
+                        value={addon.name}
+                        onChange={(e) => {
+                          const newAddOns = [...formData.addOns];
+                          newAddOns[idx].name = e.target.value;
+                          setFormData({ ...formData, addOns: newAddOns });
+                        }}
+                        className="flex-1 px-3 py-1 rounded bg-dark-bg border border-primary-gold/30 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-gold"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Price"
+                        value={addon.price}
+                        onChange={(e) => {
+                          const newAddOns = [...formData.addOns];
+                          newAddOns[idx].price = e.target.value;
+                          setFormData({ ...formData, addOns: newAddOns });
+                        }}
+                        className="w-24 px-3 py-1 rounded bg-dark-bg border border-primary-gold/30 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-gold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, addOns: formData.addOns.filter((_, i) => i !== idx) })}
+                        className="px-2 py-1 text-red-400 hover:bg-red-500/20 rounded text-sm font-semibold"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {formData.addOns.length === 0 && <p className="text-gray-500 text-xs mt-1">No add-ons added</p>}
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <label className="block text-sm font-semibold">Sizes (Optional)</label>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, sizes: [...formData.sizes, { name: '', label: '', price: '', servings: '' }] })}
+                    className="text-xs bg-primary-gold/20 text-primary-gold px-2 py-1 rounded hover:bg-primary-gold/30 font-semibold"
+                  >
+                    + Add
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {formData.sizes.map((size, idx) => (
+                    <div key={idx} className="flex gap-2 items-end">
+                      <input
+                        type="text"
+                        placeholder="Size name (Small, Medium, Large)"
+                        value={size.name}
+                        onChange={(e) => {
+                          const newSizes = [...formData.sizes];
+                          newSizes[idx].name = e.target.value;
+                          setFormData({ ...formData, sizes: newSizes });
+                        }}
+                        className="flex-1 px-3 py-1 rounded bg-dark-bg border border-primary-gold/30 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-gold"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Price"
+                        value={size.price}
+                        onChange={(e) => {
+                          const newSizes = [...formData.sizes];
+                          newSizes[idx].price = e.target.value;
+                          setFormData({ ...formData, sizes: newSizes });
+                        }}
+                        className="w-24 px-3 py-1 rounded bg-dark-bg border border-primary-gold/30 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-gold"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Servings"
+                        value={size.servings}
+                        onChange={(e) => {
+                          const newSizes = [...formData.sizes];
+                          newSizes[idx].servings = e.target.value;
+                          setFormData({ ...formData, sizes: newSizes });
+                        }}
+                        className="w-24 px-3 py-1 rounded bg-dark-bg border border-primary-gold/30 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-primary-gold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, sizes: formData.sizes.filter((_, i) => i !== idx) })}
+                        className="px-2 py-1 text-red-400 hover:bg-red-500/20 rounded text-sm font-semibold"
+                      >
+                        X
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {formData.sizes.length === 0 && <p className="text-gray-500 text-xs mt-1">No sizes added</p>}
               </div>
 
               <div className="flex gap-2 items-center">

@@ -8,7 +8,7 @@ import useStore from '@/store/useStore';
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { getTotalItems, user, logout, isLoggedIn, syncCartFromServer, syncWishlistFromServer } = useStore();
+  const { getTotalItems, getWishlistCount, user, logout, isLoggedIn, syncCartFromServer, syncWishlistFromServer } = useStore();
 
   useEffect(() => {
     setIsMounted(true);
@@ -45,8 +45,8 @@ const Header = () => {
           <Link href="/menu" className="text-gray-300 hover:text-primary-gold transition-colors">
             Menu
           </Link>
-          <Link href="/about" className="text-gray-300 hover:text-primary-gold transition-colors">
-            About
+          <Link href="/orders" className="text-gray-300 hover:text-primary-gold transition-colors">
+            My Orders
           </Link>
           <Link href="/contact" className="text-gray-300 hover:text-primary-gold transition-colors">
             Contact
@@ -55,43 +55,50 @@ const Header = () => {
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
-          {/* Wishlist */}
-          <Link href="/wishlist">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="relative glass rounded-lg px-4 py-2"
-              title="My Wishlist"
-            >
-              ❤️
-            </motion.button>
-          </Link>
+          {/* Wishlist - Only show when logged in */}
+          {isMounted && isLoggedIn() && (
+            <Link href="/wishlist">
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative glass rounded-lg px-4 py-2"
+                title="My Wishlist"
+              >
+                ❤️
+                {getWishlistCount() > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary-gold text-secondary-dark-brown text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                    {getWishlistCount()}
+                  </span>
+                )}
+              </motion.button>
+            </Link>
+          )}
 
-          {/* Cart */}
-          <Link href="/cart">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="relative glass rounded-lg px-4 py-2"
-            >
-              🛒
-              {isMounted && getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary-gold text-secondary-dark-brown text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </motion.button>
-          </Link>
+          {/* Cart - Only show when logged in */}
+          {isMounted && isLoggedIn() && (
+            <Link href="/cart">
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative glass rounded-lg px-4 py-2"
+              >
+                🛒
+                {getTotalItems() > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-primary-gold text-secondary-dark-brown text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                    {getTotalItems()}
+                  </span>
+                )}
+              </motion.button>
+            </Link>
+          )}
 
           {/* Auth */}
           {isMounted && user ? (
-            <div className="flex items-center gap-4">
-              <Link href="/profile" className="text-gray-300 hover:text-primary-gold transition-colors">
-                {user.name}
+            <div className="flex items-center gap-3">
+              <Link href="/profile" className="flex items-center gap-2 text-gray-300 hover:text-primary-gold transition-colors text-sm font-medium">
+                <span className="text-xl">👤</span>
+                <span>{user.name?.split(' ')[0] || 'Account'}</span>
               </Link>
-              <button onClick={logout} className="btn btn-outline px-4 py-2">
-                Logout
-              </button>
             </div>
           ) : isMounted ? (
             <Link href="/login" className="btn btn-primary px-4 py-2">
@@ -128,8 +135,8 @@ const Header = () => {
             <Link href="/menu" className="block text-gray-300 hover:text-primary-gold">
               Menu
             </Link>
-            <Link href="/about" className="block text-gray-300 hover:text-primary-gold">
-              About
+            <Link href="/orders" className="block text-gray-300 hover:text-primary-gold">
+              My Orders
             </Link>
             <Link href="/contact" className="block text-gray-300 hover:text-primary-gold">
               Contact
