@@ -82,9 +82,10 @@ router.post('/', auth, async (req, res) => {
       total,
       paymentMethod,
       couponCode,
+      status: paymentMethod === 'razorpay' ? 'pending_payment' : 'placed',
       statusTimeline: [
         {
-          status: 'placed',
+          status: paymentMethod === 'razorpay' ? 'pending_payment' : 'placed',
           timestamp: new Date(),
         },
       ],
@@ -126,7 +127,7 @@ router.post('/', auth, async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.userId }).populate('items.food').populate('deliveryAddress').sort({ createdAt: -1 });
+    const orders = await Order.find({ user: req.userId, status: { $ne: 'pending_payment' } }).populate('items.food').populate('deliveryAddress').sort({ createdAt: -1 });
 
     res.json({ success: true, orders });
   } catch (error) {

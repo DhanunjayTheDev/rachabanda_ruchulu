@@ -68,6 +68,22 @@ router.post('/login', async (req, res) => {
 
 router.get('/orders', adminAuth, async (req, res) => {
   try {
+    // Hide orders that haven't been paid for yet from the main dashboard
+    const orders = await Order.find({ status: { $ne: 'pending_payment' } })
+      .populate('user', 'name email phone')
+      .populate('items.food')
+      .populate('deliveryAddress')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, orders });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// New route to see ALL orders including pending ones (optional useful debug/audit)
+router.get('/orders/all', adminAuth, async (req, res) => {
+  try {
     const orders = await Order.find()
       .populate('user', 'name email phone')
       .populate('items.food')
@@ -137,7 +153,7 @@ router.post('/foods', adminAuth, upload.single('image'), async (req, res) => {
     }
 
     const imageUrl = req.file ? req.file.path : null;
-    
+
     let parsedAddOns = [];
     if (addOns) {
       try {
@@ -191,12 +207,12 @@ router.put('/foods/:id', adminAuth, upload.single('image'), async (req, res) => 
       isFeatured: isFeatured !== undefined ? isFeatured === 'true' : undefined,
       ingredients: ingredients ? JSON.parse(ingredients) : undefined,
     };
-    
+
     if (foodType) {
       updateData.foodType = foodType;
       updateData.isVegetarian = ['veg', 'vegan', 'jain', 'egg-free', 'gluten-free', 'sugar-free'].includes(foodType);
     }
-    
+
     if (addOns) {
       try {
         updateData.addOns = JSON.parse(addOns);
@@ -347,7 +363,7 @@ router.get('/dashboard/stats', adminAuth, async (req, res) => {
       const Review = require('../models/Review');
       const ratingResult = await Review.aggregate([{ $group: { _id: null, avg: { $avg: '$rating' } } }]);
       avgRating = ratingResult[0]?.avg || 0;
-    } catch {}
+    } catch { }
 
     res.json({
       success: true,

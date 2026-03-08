@@ -18,8 +18,8 @@ interface OrderItem {
 interface DeliveryAddress { addressLine1: string; addressLine2?: string; city: string; state: string; zipCode: string; phoneNumber?: string; label?: string; location?: { coordinates: [number, number] }; }
 interface Order { _id: string; orderId?: string; user?: { name?: string; email?: string; phone?: string }; items: OrderItem[]; deliveryType: string; deliveryAddress?: DeliveryAddress; deliveryLocation?: { coordinates: [number, number] }; subtotal?: number; tax?: number; deliveryFee?: number; discount?: number; total?: number; totalAmount?: number; couponCode?: string; paymentMethod?: string; paymentStatus?: string; status: string; statusTimeline?: { status: string; timestamp: string; notes?: string }[]; notes?: string; createdAt: string; }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
+  { value: 'pending_payment', label: 'Awaiting Payment' },
   { value: 'placed', label: 'Placed' },
   { value: 'confirmed', label: 'Confirmed' },
   { value: 'preparing', label: 'Preparing' },
@@ -37,6 +37,7 @@ const STATUS_COLORS: Record<string, string> = {
   placed: 'bg-red-500/20 text-red-400 border border-red-500/30',
   confirmed: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',
   cancelled: 'bg-gray-600/20 text-gray-400 border border-gray-500/30',
+  pending_payment: 'bg-white/5 text-gray-500 border border-white/10',
 };
 
 function StatusPill({ status }: { status: string }) {

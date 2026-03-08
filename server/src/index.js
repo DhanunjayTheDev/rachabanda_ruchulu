@@ -79,6 +79,35 @@ const startServer = async () => {
     });
   });
 
+  // Auto-cancel pending_payment orders after 5 minutes
+  setInterval(async () => {
+    try {
+      const Order = require('./models/Order');
+      const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const result = await Order.updateMany(
+        {
+          status: 'pending_payment',
+          createdAt: { $lt: fiveMinsAgo }
+        },
+        {
+          $set: { status: 'cancelled' },
+          $push: {
+            statusTimeline: {
+              status: 'cancelled',
+              timestamp: new Date(),
+              notes: 'Auto-cancelled due to payment timeout (5 mins)'
+            }
+          }
+        }
+      );
+      if (result.modifiedCount > 0) {
+        console.log(`🧹 Auto-cancelled ${result.modifiedCount} stale pending orders.`);
+      }
+    } catch (err) {
+      console.error('Failed to auto-cancel orders:', err);
+    }
+  }, 60000); // Check every minute
+
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

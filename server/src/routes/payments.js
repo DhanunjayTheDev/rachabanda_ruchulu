@@ -77,15 +77,27 @@ router.post('/verify', auth, async (req, res) => {
     await payment.save();
 
     const order = await Order.findById(payment.order);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
     order.paymentStatus = 'completed';
     order.status = 'confirmed';
     order.paymentId = razorpayPaymentId;
     order.statusTimeline.push({
       status: 'confirmed',
       timestamp: new Date(),
+      notes: 'Payment verified via Razorpay'
     });
 
     await order.save();
+
+    // Populate food and user details before broadcasting to admin
+    await order.populate('items.food');
+    await order.populate('user', 'name email phone');
+    if (order.deliveryAddress) {
+      await order.populate('deliveryAddress');
+    }
 
     // Broadcast as 'created' for the admin since it's now a valid active order
     broadcastOrdersUpdate('created', order);

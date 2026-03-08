@@ -209,7 +209,7 @@ export default function CheckoutPage() {
 
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummykey',
-          amount: total * 100,
+          amount: Math.round(total * 100),
           currency: 'INR',
           name: 'Rachabanda Ruchulu',
           description: 'Order Payment',
@@ -263,25 +263,6 @@ export default function CheckoutPage() {
           },
           theme: {
             color: '#D4AF37',
-          },
-          config: {
-            display: {
-              blocks: {
-                banks: {
-                  name: 'All Payment Methods',
-                  instruments: [
-                    { method: 'upi' },
-                    { method: 'card' },
-                    { method: 'netbanking' },
-                    { method: 'wallet' },
-                  ],
-                },
-              },
-              sequence: ['block.banks'],
-              preferences: {
-                show_default_blocks: true,
-              },
-            },
           },
         };
 

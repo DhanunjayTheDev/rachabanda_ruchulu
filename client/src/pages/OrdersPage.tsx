@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { orderAPI } from '@/lib/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { orderAPI, paymentAPI } from '@/lib/api';
 import { useToast } from '@/lib/ToastContext';
 import useStore from '@/store/useStore';
-import { X, Search, Navigation } from 'lucide-react';
+import { X, Navigation, CreditCard, Loader2 } from 'lucide-react';
 import { useRealtimeOrders } from '@/hooks/useRealtime';
 
 interface OrderItem {
@@ -47,14 +47,17 @@ const STATUS_COLORS: Record<string, string> = {
   placed: 'bg-red-500/20 text-red-400',
   confirmed: 'bg-orange-500/20 text-orange-400',
   cancelled: 'bg-gray-600/20 text-gray-400',
+  pending_payment: 'bg-white/5 text-gray-500 border border-white/10',
 };
 
 export default function OrdersPage() {
   const { addToast } = useToast();
   const { isLoggedIn } = useStore();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [repaying, setRepaying] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -85,6 +88,60 @@ export default function OrdersPage() {
       fetchOrders();
     }
   });
+
+  const handleRepay = async (order: Order) => {
+    try {
+      setRepaying(order._id);
+
+      const paymentRes = await paymentAPI.createOrder({
+        orderId: order._id,
+        amount: Number(order.totalAmount || order.total || 0)
+      });
+
+      if (!paymentRes.data?.success || !paymentRes.data?.razorpayOrderId) {
+        throw new Error('Failed to create payment session');
+      }
+
+      const { razorpayOrderId, paymentId } = paymentRes.data;
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummykey',
+        amount: Math.round(Number(order.totalAmount || order.total || 0) * 100),
+        currency: 'INR',
+        name: 'Rachabanda Ruchulu',
+        description: 'Order Payment Retry',
+        order_id: razorpayOrderId,
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await paymentAPI.verify({
+              paymentId,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+
+            if (verifyRes.data?.success) {
+              addToast('Payment successful! 🎉', 'success');
+              setSelectedOrder(null);
+              fetchOrders();
+            } else {
+              throw new Error('Payment verification failed');
+            }
+          } catch (error: any) {
+            addToast(error.response?.data?.message || 'Verification failed', 'error');
+          }
+        },
+        theme: { color: '#D4AF37' }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      addToast(err.message || 'Payment failed to initiate', 'error');
+    } finally {
+      setRepaying(null);
+    }
+  };
 
   if (!isLoggedIn()) {
     return (
@@ -146,7 +203,7 @@ export default function OrdersPage() {
                   <div className="md:col-span-1">
                     <p className="text-xs text-gray-400 mb-1">STATUS</p>
                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[order.status] || STATUS_COLORS.placed}`}>
-                      {order.status}
+                      {order.status === 'pending_payment' ? 'Waiting for Payment' : order.status.replace(/-/g, ' ')}
                     </span>
                   </div>
                   <div className="md:col-span-1 flex justify-between items-center md:flex-col md:items-end md:justify-center">
@@ -196,7 +253,7 @@ export default function OrdersPage() {
                 <div className="p-4 rounded-lg bg-dark-bg/50 border border-gray-700/50">
                   <p className="text-xs text-gray-400 mb-1">Status</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[selectedOrder.status] || STATUS_COLORS.placed}`}>
-                    {selectedOrder.status}
+                    {selectedOrder.status === 'pending_payment' ? 'Waiting for Payment' : selectedOrder.status.replace(/-/g, ' ')}
                   </span>
                 </div>
                 <div className="p-4 rounded-lg bg-dark-bg/50 border border-gray-700/50">
@@ -251,6 +308,31 @@ export default function OrdersPage() {
                   })}
                 </div>
               </div>
+
+              {/* REPAY BUTTON IF PENDING */}
+              {selectedOrder.status === 'pending_payment' && (
+                <div className="mt-8 p-4 bg-primary-gold/5 border border-primary-gold/20 rounded-xl text-center">
+                  <p className="text-sm text-gray-300 mb-4">You have not completed the payment for this order yet.</p>
+                  <button
+                    onClick={() => handleRepay(selectedOrder)}
+                    disabled={repaying === selectedOrder._id}
+                    className="btn btn-primary w-full py-4 flex items-center justify-center gap-2"
+                  >
+                    {repaying === selectedOrder._id ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Initializing Payment...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-5 h-5" />
+                        Pay Now (₹{Number(selectedOrder.totalAmount || selectedOrder.total || 0).toFixed(2)})
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-gray-500 mt-2 italic">Note: Payment window expires in 5 minutes.</p>
+                </div>
+              )}
             </div>
 
             {/* STICKY FOOTER */}
@@ -271,22 +353,28 @@ export default function OrdersPage() {
                     <span>Delivery Fee</span><span>₹{selectedOrder.deliveryFee.toFixed(2)}</span>
                   </div>
                 )}
-                {selectedOrder.couponDiscount ? (
-                  <div className="flex justify-between text-sm text-green-400">
-                    <span>Coupon Discount</span><span>-₹{selectedOrder.couponDiscount.toFixed(2)}</span>
-                  </div>
-                ) : null}
                 <div className="flex justify-between font-bold text-lg pt-3 mt-1 border-t border-gray-700/50">
                   <span>Total Amount</span>
                   <span className="text-primary-gold text-2xl">₹{(selectedOrder.totalAmount || selectedOrder.total || 0).toFixed(2)}</span>
                 </div>
               </div>
 
-              <Link to={`/order/${selectedOrder._id}`} className="block w-full">
-                <button className="btn w-full btn-primary flex items-center justify-center gap-2 py-3">
-                  <Navigation size={18} /> Track Order Real-time
+              {selectedOrder.status !== 'pending_payment' && (
+                <Link to={`/order/${selectedOrder._id}`} className="block w-full">
+                  <button className="btn w-full btn-primary flex items-center justify-center gap-2 py-3">
+                    <Navigation size={18} /> Track Order Real-time
+                  </button>
+                </Link>
+              )}
+
+              {selectedOrder.status === 'pending_payment' && (
+                <button
+                  className="btn glass-btn w-full"
+                  onClick={() => setSelectedOrder(null)}
+                >
+                  Close
                 </button>
-              </Link>
+              )}
             </div>
           </div>
         </div>
