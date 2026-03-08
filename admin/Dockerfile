@@ -7,14 +7,13 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:18-alpine
+FROM nginx:alpine
 
-WORKDIR /app
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-EXPOSE 3000
+# SPA fallback: route all requests to index.html
+RUN printf 'server {\n  listen 80;\n  location / {\n    root /usr/share/nginx/html;\n    index index.html;\n    try_files $uri $uri/ /index.html;\n  }\n}\n' > /etc/nginx/conf.d/default.conf
 
-CMD ["npm", "start"]
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
